@@ -11,6 +11,7 @@ pub mod error;
 pub mod record;
 pub mod session;
 pub mod signing;
+pub mod text_embed;
 pub mod timestamp;
 pub mod verify;
 
