@@ -133,10 +133,7 @@ pub fn read_sidecar(
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
     let hash_ok = record.document_binding.final_text_sha256 == sha256_hex(file_bytes);
-    Ok(CredentialReadout {
-        valid: signature_ok && hash_ok,
-        record,
-    })
+    Ok(readout(signature_ok && hash_ok, record))
 }
 
 /// Verification outcome from reading a signed manifest.
@@ -144,6 +141,39 @@ pub struct CredentialReadout {
     /// True if the C2PA signature + bindings validate (Valid or Trusted).
     pub valid: bool,
     pub record: WritingSessionRecord,
+    /// Honest, non-overclaiming human-readable claim.
+    pub claim: String,
+}
+
+fn readout(valid: bool, record: WritingSessionRecord) -> CredentialReadout {
+    let claim = render_claim(valid, record.evidence_flags.large_unkeyed_insertions);
+    CredentialReadout {
+        valid,
+        record,
+        claim,
+    }
+}
+
+/// Render the honest claim. Never asserts a human originated the ideas.
+fn render_claim(valid: bool, large_unkeyed_insertions: u64) -> String {
+    if !valid {
+        return "INVALID — this credential failed verification (altered, or the document does not match).".to_string();
+    }
+    let mut parts = vec![
+        "Verified C2PA credential: signed and unaltered since issuance, bound to this exact document.".to_string(),
+    ];
+    if large_unkeyed_insertions > 0 {
+        parts.push(format!(
+            "WARNING: {large_unkeyed_insertions} large insertion(s) appeared without typing — possible paste of AI-generated text."
+        ));
+    } else {
+        parts.push(
+            "The writing showed an incremental, human-like process with no large un-keyed insertions."
+                .to_string(),
+        );
+    }
+    parts.push("This attests process integrity, not that a human originated the ideas.".to_string());
+    parts.join(" ")
 }
 
 /// Read + validate a signed asset, returning the embedded process record.
@@ -161,5 +191,5 @@ pub fn read(asset_format: &str, signed_asset: &[u8]) -> Result<CredentialReadout
     let record = manifest
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
-    Ok(CredentialReadout { valid, record })
+    Ok(readout(valid, record))
 }

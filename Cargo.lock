@@ -1182,7 +1182,6 @@ name = "humanshipd-core"
 version = "0.0.0"
 dependencies = [
  "c2pa",
- "ed25519-dalek",
  "hex",
  "image",
  "serde",
@@ -1195,18 +1194,10 @@ dependencies = [
 name = "humanshipd-host"
 version = "0.0.0"
 dependencies = [
- "chrono",
+ "base64",
  "humanshipd-core",
- "humanshipd-keystore",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "humanshipd-keystore"
-version = "0.0.0"
-dependencies = [
- "rand 0.8.6",
 ]
 
 [[package]]
@@ -1214,14 +1205,11 @@ name = "humanshipd-macos-capture"
 version = "0.0.0"
 dependencies = [
  "accessibility-sys",
- "chrono",
  "core-foundation 0.10.1",
  "humanshipd-core",
- "humanshipd-keystore",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
- "serde_json",
 ]
 
 [[package]]

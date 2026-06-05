@@ -1,4 +1,3 @@
-use humanshipd_core::Badge;
 use serde::{Deserialize, Serialize};
 
 /// Requests the extension's service worker sends to the host.
@@ -37,6 +36,7 @@ pub struct EventDto {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Response {
     Pong { version: String },
-    Badge { badge: Box<Badge> },
+    /// A C2PA credential (standalone `.c2pa` manifest store), base64-encoded.
+    Credential { manifest_b64: String },
     Error { message: String },
 }

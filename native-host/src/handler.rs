@@ -1,29 +1,22 @@
 use crate::messages::{EventDto, IssueRequest, Request, Response};
-use humanshipd_core::{
-    anchor_badge, build_record, sign_record, EditEvent, KeyPair, LocalTsa, SessionInput,
-};
-
-/// Per-request context: the client signing key and the time-anchoring authority.
-/// A fresh `tsa` (with the current time) is constructed for each request by the caller.
-pub struct Ctx<'a> {
-    pub client_key: &'a KeyPair,
-    pub tsa: LocalTsa,
-}
+use base64::Engine;
+use humanshipd_core::{build_record, credential, EditEvent, SessionInput};
 
 /// Dispatch a request to a response. Never panics; errors become `Response::Error`.
-pub fn process(request: Request, ctx: &Ctx) -> Response {
+pub fn process(request: Request) -> Response {
     match request {
         Request::Ping => Response::Pong {
             version: env!("CARGO_PKG_VERSION").to_string(),
         },
-        Request::Issue(req) => issue(req, ctx),
+        Request::Issue(req) => issue(req),
         Request::Unknown => Response::Error {
             message: "unknown request type".to_string(),
         },
     }
 }
 
-fn issue(req: IssueRequest, ctx: &Ctx) -> Response {
+fn issue(req: IssueRequest) -> Response {
+    let final_text = req.final_text.clone();
     let input = SessionInput {
         session_id: req.session_id,
         surface_kind: req.surface_kind,
@@ -33,9 +26,9 @@ fn issue(req: IssueRequest, ctx: &Ctx) -> Response {
     };
 
     let record = build_record(&input);
-    match sign_record(record, ctx.client_key).and_then(|badge| anchor_badge(badge, &ctx.tsa)) {
-        Ok(badge) => Response::Badge {
-            badge: Box::new(badge),
+    match credential::issue_sidecar(&record, final_text.as_bytes()) {
+        Ok(manifest) => Response::Credential {
+            manifest_b64: base64::engine::general_purpose::STANDARD.encode(manifest),
         },
         Err(e) => Response::Error {
             message: e.to_string(),

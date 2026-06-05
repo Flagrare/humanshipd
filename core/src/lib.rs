@@ -1,27 +1,24 @@
 //! humanshipd credential core.
 //!
 //! All credential logic lives here so every frontend (native messaging host,
-//! WASM verify page, future capture adapters) reuses byte-identical behavior.
+//! capture adapters, verify page) reuses byte-identical behavior. The credential
+//! is a C2PA manifest (via c2pa-rs); the process record is a custom assertion.
 //! See `docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`.
 
-pub mod badge;
 pub mod canonical;
 pub mod credential;
 pub mod error;
 pub mod record;
 pub mod session;
-pub mod signing;
 pub mod text_embed;
-pub mod timestamp;
-pub mod verify;
 
-pub use badge::{anchor_badge, sign_record, verify_badge_signature, Badge, Integrity};
+pub use credential::{
+    issue_ephemeral, issue_sidecar, read, read_sidecar, CredentialReadout, PROCESS_ASSERTION,
+};
 pub use error::CoreError;
 pub use record::{
     BurstStats, DocumentBinding, EvidenceFlags, PauseStats, ProcessStats, Replay, RevisionStats,
     Surface, UnkeyedInsertion, WritingSessionRecord, SCHEMA,
 };
 pub use session::{build_record, EditEvent, SessionInput, LARGE_UNKEYED_THRESHOLD};
-pub use signing::{verify_signature, KeyPair};
-pub use timestamp::{verify_timestamp, LocalTsa, TimestampAuthority, TimestampToken};
-pub use verify::{verify_badge, VerifyResult};
+pub use text_embed::{embed, extract, strip};
