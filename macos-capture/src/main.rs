@@ -1,8 +1,9 @@
 //! Diagnostic probe for the macOS Accessibility capture path.
 //!
-//! Reads the focused text of the FRONTMOST app via `AXUIElementCreateApplication(pid)`
-//! (the system-wide focused-element path returns -25204 even when trusted). Logs
-//! trust status, the app name, the focused element's role, and AX error codes.
+//! Reads the focused text of specific TARGET apps (TextEdit, Word, …) by name —
+//! regardless of which app is frontmost — so capture can be observed from another
+//! window. Uses `AXUIElementCreateApplication(pid)` (the system-wide focused
+//! element returns -25204 even when trusted).
 //!
 //! Build the signed bundle and run it (a bare `cargo run` binary lacks a TCC
 //! identity): `bash macos-capture/bundle.sh && open target/HumanshipdProbe.app`.
@@ -24,6 +25,8 @@ use std::time::Duration;
 
 const POLL_SECONDS: u32 = 20;
 const LOG_PATH: &str = "/tmp/humanshipd-axprobe.log";
+/// Apps we try to read by name, regardless of frontmost status.
+const TARGET_APPS: &[&str] = &["TextEdit", "Microsoft Word", "Word", "Scrivener", "Final Draft"];
 
 fn emit(log: &mut Option<File>, line: &str) {
     println!("{line}");
@@ -33,20 +36,21 @@ fn emit(log: &mut Option<File>, line: &str) {
     }
 }
 
-/// PID and localized name of the frontmost application.
-fn frontmost_app() -> Option<(i32, String)> {
+/// (pid, name) of every running app whose name is in TARGET_APPS.
+fn running_targets() -> Vec<(i32, String)> {
     let workspace = NSWorkspace::sharedWorkspace();
-    let app = workspace.frontmostApplication()?;
-    let pid = app.processIdentifier();
-    let name = app
-        .localizedName()
-        .map(|n| n.to_string())
-        .unwrap_or_default();
-    Some((pid, name))
+    let apps = workspace.runningApplications();
+    let mut out = Vec::new();
+    for i in 0..apps.count() {
+        let app = apps.objectAtIndex(i);
+        let name = app.localizedName().map(|n| n.to_string()).unwrap_or_default();
+        if TARGET_APPS.iter().any(|t| name == *t) {
+            out.push((app.processIdentifier(), name));
+        }
+    }
+    out
 }
 
-/// Copy a string attribute, returning the AX error code on failure
-/// (-98 null, -99 not a string).
 fn copy_string(element: AXUIElementRef, attribute: &str) -> Result<String, i32> {
     let attr = CFString::new(attribute);
     let mut value: CFTypeRef = ptr::null();
@@ -62,7 +66,6 @@ fn copy_string(element: AXUIElementRef, attribute: &str) -> Result<String, i32> 
     cf.downcast::<CFString>().map(|s| s.to_string()).ok_or(-99)
 }
 
-/// Focused UI element of the app with `pid`, via the per-application AX element.
 fn focused_element_for_pid(pid: i32) -> Result<AXUIElementRef, i32> {
     let app = unsafe { AXUIElementCreateApplication(pid) };
     if app.is_null() {
@@ -94,6 +97,26 @@ fn prompt_for_trust() -> bool {
     unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) }
 }
 
+fn report_target(tick: u32, pid: i32, name: &str) -> String {
+    match focused_element_for_pid(pid) {
+        Ok(element) => {
+            let role = copy_string(element, "AXRole").unwrap_or_else(|e| format!("<err {e}>"));
+            match copy_string(element, "AXValue") {
+                Ok(text) => format!(
+                    "[{tick:>2}s] {name} role={role} value={} chars | {}",
+                    text.chars().count(),
+                    preview(&text)
+                ),
+                Err(value_err) => {
+                    let selected = copy_string(element, "AXSelectedText").ok();
+                    format!("[{tick:>2}s] {name} role={role} AXValue err={value_err} selected={selected:?}")
+                }
+            }
+        }
+        Err(e) => format!("[{tick:>2}s] {name} (pid {pid}) focused-element err={e}"),
+    }
+}
+
 fn main() {
     let mut log = File::create(LOG_PATH).ok();
 
@@ -101,32 +124,19 @@ fn main() {
     emit(&mut log, &format!("AXIsProcessTrusted = {trusted}"));
     emit(
         &mut log,
-        &format!("\nPolling {POLL_SECONDS}s — click into TextEdit, then Word, and type:\n"),
+        &format!("\nPolling {POLL_SECONDS}s — type in TextEdit / Word (no need to keep them frontmost):\n"),
     );
 
     for tick in 0..POLL_SECONDS {
-        let line = match frontmost_app() {
-            Some((pid, name)) => match focused_element_for_pid(pid) {
-                Ok(element) => {
-                    let role =
-                        copy_string(element, "AXRole").unwrap_or_else(|e| format!("<err {e}>"));
-                    match copy_string(element, "AXValue") {
-                        Ok(text) => format!(
-                            "[{tick:>2}s] app={name} role={role} value={} chars | {}",
-                            text.chars().count(),
-                            preview(&text)
-                        ),
-                        Err(value_err) => {
-                            let selected = copy_string(element, "AXSelectedText").ok();
-                            format!("[{tick:>2}s] app={name} role={role} AXValue err={value_err} selected={selected:?}")
-                        }
-                    }
-                }
-                Err(e) => format!("[{tick:>2}s] app={name} (pid {pid}) focused-element err={e}"),
-            },
-            None => format!("[{tick:>2}s] no frontmost app"),
-        };
-        emit(&mut log, &line);
+        let targets = running_targets();
+        if targets.is_empty() {
+            emit(&mut log, &format!("[{tick:>2}s] no target apps running (open TextEdit or Word)"));
+        } else {
+            for (pid, name) in targets {
+                let line = report_target(tick, pid, &name);
+                emit(&mut log, &line);
+            }
+        }
         sleep(Duration::from_secs(1));
     }
     emit(&mut log, &format!("\nDone. (log: {LOG_PATH})"));
