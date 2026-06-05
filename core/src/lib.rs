@@ -6,6 +6,7 @@
 
 pub mod badge;
 pub mod canonical;
+pub mod credential;
 pub mod error;
 pub mod record;
 pub mod session;
