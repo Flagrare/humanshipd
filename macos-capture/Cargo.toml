@@ -10,6 +10,10 @@ name = "humanshipd_capture"
 
 [dependencies]
 humanshipd-core = { path = "../core" }
+
+# macOS-only Accessibility crates — target-gated so the workspace builds on every
+# OS (only the relevant capture adapter compiles per platform).
+[target.'cfg(target_os = "macos")'.dependencies]
 core-foundation = "0.10"
 accessibility-sys = "0.1"
 objc2 = "0.6"
