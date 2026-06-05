@@ -5,6 +5,9 @@
 //! the same or a near-identical code. That's what lets a credential survive
 //! copy-paste and minor changes — the durable (soft) binding behind Durable
 //! Content Credentials. Stored in the manifest as a `c2pa.soft-binding` assertion.
+//!
+//! Adopts `iscc-lib` (ISO 24138). See research:
+//! `docs/research/2026-06-05-adopting-c2pa-credential-stack.md`.
 
 use crate::error::CoreError;
 use serde::{Deserialize, Serialize};

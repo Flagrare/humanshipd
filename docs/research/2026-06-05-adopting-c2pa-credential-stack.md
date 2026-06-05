@@ -49,6 +49,31 @@ Which concrete standards and maintained Rust SDKs should humanshipd build the cr
 - **Accessed:** 2026-06-05 · **Relevance:** medium (optional)
 - **What this contributed:** Append-only transparency log; `HashedRekordV2` fits anchoring the final-text hash + signature. Pre-1.0. **Keep strictly opt-in** — it requires a network call, against the local-only/zero-telemetry default.
 
+### ISCC — the durable fingerprint standard (Layer 3)
+
+When implementing the durable (soft) binding, we confirmed the standard and its Rust implementation.
+
+#### [ISO 24138:2024 — International Standard Content Code (ISCC)](https://www.iso.org/standard/77899.html)
+- **Authors / Org:** ISO / ISCC Foundation
+- **Type:** spec (primary)
+- **Published:** 2024 · **Accessed:** 2026-06-05
+- **Relevance:** high (the durable-binding standard)
+- **What this contributed:** Defines ISCC — similarity-preserving, content-derived identifiers across media types. This is *why* the durable binding survives reformatting/light edits where a SHA-256 hard binding can't: a near-identical document yields the same or a near ISCC code. It's the standard behind the `io.iscc.v0` soft-binding entry.
+
+#### [iscc-core — reference implementation](https://github.com/iscc/iscc-core)
+- **Authors / Org:** ISCC Foundation
+- **Type:** open-source project (reference, Python)
+- **Published:** ongoing · **Accessed:** 2026-06-05
+- **Relevance:** medium
+- **What this contributed:** The 100%-test-covered Python reference for the ISCC algorithms; the conformance baseline that the Rust implementation is tested against. Establishes the `gen_text_code_v0(text, bits)` API shape we use.
+
+#### [iscc-lib — Rust implementation](https://github.com/iscc/iscc-lib) ([docs](https://lib.iscc.codes/))
+- **Authors / Org:** ISCC Foundation
+- **Type:** open-source project (Rust)
+- **Published:** v0.4.0 (crates.io) · **Accessed:** 2026-06-05
+- **Relevance:** high (adopted)
+- **What this contributed:** The Rust implementation of ISO 24138 we adopted (rather than reimplementing the algorithm). `gen_text_code_v0` produces the Text-Code we attach as the C2PA soft binding. Conformance-tested against the Python reference, so its codes match the broader ISCC ecosystem.
+
 ## Synthesis
 
 **Replace the bespoke `Badge` with a C2PA manifest emitted by c2pa-rs. Keep bespoke only what has no standard: the process-metadata schema and the "Human Authored" claim semantics.**
@@ -87,5 +112,7 @@ Sources (this round): [C2PA 2.4 spec — A.4 PDF / A.6 ZIP-EPUB-OOXML / A.7 HTML
 
 ## Downstream uses
 
-- Refactor of `core`: `credential.rs` (c2pa-rs) added; bespoke `badge/signing/timestamp` to be removed once host+capture call `credential`. 
-- Design spec §6/§7/§9 updates.
+- `core/src/credential.rs` — C2PA credential via c2pa-rs (Layers 1 & 2); bespoke badge/signing/timestamp removed.
+- `core/src/fingerprint.rs` — ISCC durable fingerprint (Layer 3a) via `iscc-lib`, attached as a `c2pa.soft-binding` assertion.
+- `registry/` — opt-in fingerprint → credential lookup service (Layer 3b); `registry/tests/durable_recovery.rs` proves end-to-end recovery.
+- Design spec §6/§7/§9; README ("how the certificate travels").
