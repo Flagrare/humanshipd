@@ -89,6 +89,29 @@ Is an app-agnostic, OS-level capture layer feasible that observes a user's writi
 - **Relevance:** high (the way *around* the canvas problem)
 - **What this contributed:** Demonstrates that Google Docs stores a **complete per-character revision history** (persistent per-character IDs) that an **in-page browser extension** can fetch and replay keystroke-by-keystroke — richer than Accessibility or OCR. The revision fetch hits *Google's* endpoint for the user's *own* document and is processed locally (Draftback sends nothing to a third-party server), so it is compatible with a local-only / zero-telemetry design (with that nuance noted). This is the proven capture path for Docs and the model Aidify/Grammarly Authorship also follow.
 
+### Avoiding a second codebase for Google Docs — exhausted alternatives + the drift fix
+> Investigated 2026-06-05 in response to the maintenance concern that a Docs browser extension + a native adapter = two codebases that drift.
+
+**All single-codebase capture paths for Docs fail; the only fine-grained signal lives in the page. The fix is architectural: one shared Rust core, with the browser side reduced to a thin event-forwarding shim.**
+
+- **OS-level accessibility of Docs** — works only if the user manually enables Docs "screen reader support" (off by default), and even then exposes coarse text/caret via a hidden side-DOM, not an ordered per-edit/keystroke stream. Impractical + fragile. ([Google screen-reader help](https://support.google.com/docs/answer/6282736?hl=en); a11y context [WebAIM](https://webaim.org/blog/seismic-change-to-docs/))
+- **Official Google APIs** — [Drive `revisions` v3](https://developers.google.com/workspace/drive/api/reference/rest/v3/revisions) are coarse saved-snapshots (30-day auto-purge, ~200 cap, [incomplete vs editor history](https://hawksey.info/blog/2022/07/working-with-the-google-drive-api-revisions-history-tips-for-handling-revision-merges/)). No edit-level API exists. Only fine-grained source = Docs' undocumented realtime mutation feed (Draftback), which is in-page only.
+- **Chrome DevTools Protocol** — [Chrome 136 (Mar 2025) stopped honoring `--remote-debugging-port` on the default profile](https://developer.chrome.com/blog/remote-debugging-port) (anti-cookie-theft). Can't attach to the user's real logged-in Chrome without a separate profile = unacceptable friction + malware optics. Reject for consumers.
+
+#### [Native messaging (Chrome)](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging) ([MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging), [friction analysis](https://textslashplain.com/2020/09/04/web-to-app-communication-the-native-messaging-api/))
+- **Authors / Org:** Google; Mozilla; Eric Lawrence (ex-Chrome/Edge)
+- **Type:** vendor doc; blog
+- **Published:** maintained / 2020 · **Accessed:** 2026-06-05
+- **Relevance:** high (the bridge that keeps logic in one place)
+- **What this contributed:** stdio-JSON (length-prefixed UTF-8) protocol letting a thin extension forward raw events to a full-privilege native host. User-level (HKCU/`~/Library`) install avoids admin but is per-user. Basis for "extension is a dumb tap → native Rust core signs."
+
+#### Shared-core precedents: [1Password (Serokell)](https://serokell.io/blog/rust-in-production-1password) ([Syntax transcript](https://syntax.fm/show/776/how-1password-uses-wasm-and-rust-for-local-first-dev-with-andrew-burkhart/transcript)) · [Bitwarden SDK](https://contributing.bitwarden.com/architecture/sdk/internal/web/interoperability/) · [Tailscale ts-browser-ext](https://github.com/tailscale/ts-browser-ext)
+- **Authors / Org:** Serokell/1Password; Bitwarden; Tailscale
+- **Type:** blog / OSS docs / OSS repo
+- **Published:** recent / ongoing · **Accessed:** 2026-06-05
+- **Relevance:** high (proves the drift fix at scale)
+- **What this contributed:** 1Password & Bitwarden ship one Rust core compiled to **WASM** for the extension, with **Typeshare**/**tsify** auto-generating TS types so the Rust↔TS boundary can't drift. Tailscale's extension drives a native binary over Native Messaging because "extensions don't have enough APIs." Two production patterns: WASM-core (self-contained extension) or Native-Messaging-to-native-core (dumb extension). For this project the latter is the stronger drift-killer since a native companion ships anyway.
+
 ## Synthesis
 
 **An app-agnostic, on-device, open-source capture layer is feasible and has shipped (screenpipe, Rewind, Glass; and, for web editors, Draftback/Aidify/Grammarly). The capture is the easy ~80%; the attestation semantics on top are the hard, valuable, partly-unsolved 20%.** The most feasible architecture is a **portfolio of per-surface adapters behind one common record format** — not a single universal hook. Each adapter uses the best available method for its surface:
@@ -106,6 +129,8 @@ Is an app-agnostic, OS-level capture layer feasible that observes a user's writi
 - **Browser-extension caveats:** browser-scoped (native apps still need the AX adapter); Draftback-style revision fetch hits Google's endpoint for the user's own doc (processed locally, nothing sent to us — note this nuance for the local-only claim).
 - **Granularity:** screenshot diffing only resolves bursts; per-keystroke timing needs input monitoring (extra permission) or an in-page/AX edit-event stream.
 - **Permission irony:** the OS-level adapters need spyware-grade permissions. Mitigation for a privacy-first OSS project: auditable code, AX-over-screenshots, allow-list only the focused writing app, store only hashes/timestamps, zero network except the stateless tamper-check.
+
+**Drift mitigation (the two-codebases concern):** you cannot delete browser-side capture for Docs (fine-grained edit data is in-page only), but you can delete the *second codebase* in any meaningful sense. Put 100% of record/hash/sign/verify in **one Rust core** compiled native; the browser extension becomes a thin **MV3** event tap forwarding raw events over **Native Messaging** to that core (Tailscale pattern), holding zero credential logic. Drift drops to only the irreducible per-surface capture shims. (WASM-core + Typeshare/tsify, the 1Password/Bitwarden pattern, is the alternative if a self-contained offline-signing extension is ever wanted.)
 
 **Licensing note:** prefer reusing screenpipe's *patterns* (MIT core) over Glass/cheating-daddy *code* (GPL-3.0 copyleft).
 
