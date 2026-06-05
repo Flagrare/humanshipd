@@ -1,6 +1,10 @@
 # Assistant working files (local memory/logs, not project content)
 .remember/
 
+# Rust build artifacts (Cargo.lock is committed — workspace has binaries)
+/target/
+**/*.rs.bk
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db
