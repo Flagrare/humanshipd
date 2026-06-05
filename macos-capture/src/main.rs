@@ -1,94 +1,108 @@
-//! Probe: read the focused UI element's text via the macOS Accessibility API.
+//! Diagnostic probe for the macOS Accessibility capture path.
 //!
-//! This is the de-risking first step of the native capture adapter. It proves we
-//! can read live text from an arbitrary focused app (TextEdit, then Word) before
-//! we build the full diff + keystroke-correlation pipeline.
+//! Prints trust status, the focused element's role, and exact AX error codes each
+//! second, and *prompts* for Accessibility permission if it is missing. Used to
+//! pin down why focused-text capture returns nothing before building the real
+//! adapter.
 //!
 //! Run: `cargo run -p humanshipd-macos-capture`
-//! Requires granting this binary "Accessibility" permission in
-//! System Settings → Privacy & Security → Accessibility.
+//! Then click into TextEdit (and Word) and type while it polls.
 
 use accessibility_sys::{
-    kAXErrorSuccess, AXIsProcessTrusted, AXUIElementCopyAttributeValue,
+    kAXErrorSuccess, AXIsProcessTrustedWithOptions, AXUIElementCopyAttributeValue,
     AXUIElementCreateSystemWide, AXUIElementRef,
 };
-use core_foundation::base::{CFTypeRef, TCFType};
-use core_foundation::string::{CFString, CFStringRef};
+use core_foundation::base::{CFType, CFTypeRef, TCFType};
+use core_foundation::boolean::CFBoolean;
+use core_foundation::dictionary::CFDictionary;
+use core_foundation::string::CFString;
 use std::ptr;
 use std::thread::sleep;
 use std::time::Duration;
 
-/// Seconds to poll so the operator can switch focus to a target app and type.
 const POLL_SECONDS: u32 = 20;
 
-/// Read a string attribute (e.g. "AXValue") from an AX element, if present.
-fn copy_string_attribute(element: AXUIElementRef, attribute: &str) -> Option<String> {
+/// Copy a string attribute, returning the AX error code on failure
+/// (or -99 if the value exists but is not a string).
+fn copy_string(element: AXUIElementRef, attribute: &str) -> Result<String, i32> {
     let attr = CFString::new(attribute);
     let mut value: CFTypeRef = ptr::null();
-    let err = unsafe {
-        AXUIElementCopyAttributeValue(element, attr.as_concrete_TypeRef(), &mut value)
-    };
-    if err != kAXErrorSuccess || value.is_null() {
-        return None;
+    let err =
+        unsafe { AXUIElementCopyAttributeValue(element, attr.as_concrete_TypeRef(), &mut value) };
+    if err != kAXErrorSuccess {
+        return Err(err);
     }
-    // Interpret the returned value as a CFString and own it.
-    let cf = unsafe { CFString::wrap_under_create_rule(value as CFStringRef) };
-    Some(cf.to_string())
+    if value.is_null() {
+        return Err(-98);
+    }
+    let cf = unsafe { CFType::wrap_under_create_rule(value) };
+    cf.downcast::<CFString>().map(|s| s.to_string()).ok_or(-99)
 }
 
-/// Read the AX element currently focused system-wide, if any.
-fn copy_focused_element() -> Option<AXUIElementRef> {
+/// Copy the system-wide focused UI element, returning the AX error on failure.
+fn copy_focused_element() -> Result<AXUIElementRef, i32> {
     let system_wide = unsafe { AXUIElementCreateSystemWide() };
     let attr = CFString::new("AXFocusedUIElement");
     let mut value: CFTypeRef = ptr::null();
     let err = unsafe {
         AXUIElementCopyAttributeValue(system_wide, attr.as_concrete_TypeRef(), &mut value)
     };
-    if err != kAXErrorSuccess || value.is_null() {
-        return None;
+    if err != kAXErrorSuccess {
+        return Err(err);
     }
-    Some(value as AXUIElementRef)
+    if value.is_null() {
+        return Err(-98);
+    }
+    Ok(value as AXUIElementRef)
 }
 
-fn focused_text() -> Option<String> {
-    let focused = copy_focused_element()?;
-    copy_string_attribute(focused, "AXValue")
-}
-
-/// A single-line, length-capped preview of captured text for the console.
 fn preview(text: &str) -> String {
-    let one_line: String = text.chars().map(|c| if c == '\n' { '⏎' } else { c }).collect();
-    let capped: String = one_line.chars().take(60).collect();
-    if one_line.chars().count() > 60 {
-        format!("{capped}…")
-    } else {
-        capped
-    }
+    let one_line: String = text
+        .chars()
+        .map(|c| if c == '\n' { '⏎' } else { c })
+        .take(60)
+        .collect();
+    one_line
+}
+
+/// Prompt for Accessibility permission (shows the system dialog if not granted).
+fn prompt_for_trust() -> bool {
+    let key = CFString::new("AXTrustedCheckOptionPrompt");
+    let value = CFBoolean::true_value();
+    let options = CFDictionary::from_CFType_pairs(&[(key.as_CFType(), value.as_CFType())]);
+    unsafe { AXIsProcessTrustedWithOptions(options.as_concrete_TypeRef()) }
 }
 
 fn main() {
-    if !unsafe { AXIsProcessTrusted() } {
-        eprintln!(
-            "Accessibility permission NOT granted.\n\
-             Grant it in System Settings → Privacy & Security → Accessibility\n\
-             (add your terminal app, or target/debug/humanshipd-macos-capture),\n\
-             then re-run."
+    let trusted = prompt_for_trust();
+    println!("AXIsProcessTrusted = {trusted}");
+    if !trusted {
+        println!(
+            "→ A permission dialog should have appeared. Grant Accessibility to your\n\
+             terminal app (or target/debug/humanshipd-macos-capture), then re-run."
         );
-        return;
     }
+    println!("\nPolling {POLL_SECONDS}s — click into TextEdit, then Word, and type:\n");
 
-    println!("Polling the focused text field for {POLL_SECONDS}s.");
-    println!("Click into TextEdit (then Word) and type — captured text appears below:\n");
-
-    let mut last: Option<String> = None;
     for tick in 0..POLL_SECONDS {
-        let current = focused_text();
-        if current != last {
-            match &current {
-                Some(text) => println!("[{tick:>2}s] {:>4} chars | {}", text.chars().count(), preview(text)),
-                None => println!("[{tick:>2}s] (no focused text element)"),
+        match copy_focused_element() {
+            Ok(element) => {
+                let role = copy_string(element, "AXRole").unwrap_or_else(|e| format!("<err {e}>"));
+                match copy_string(element, "AXValue") {
+                    Ok(text) => println!(
+                        "[{tick:>2}s] role={role} value={} chars | {}",
+                        text.chars().count(),
+                        preview(&text)
+                    ),
+                    Err(value_err) => {
+                        let selected = copy_string(element, "AXSelectedText").ok();
+                        println!(
+                            "[{tick:>2}s] role={role} AXValue err={value_err} selected={selected:?}"
+                        );
+                    }
+                }
             }
-            last = current;
+            Err(e) => println!("[{tick:>2}s] no focused element (AXError {e})"),
         }
         sleep(Duration::from_secs(1));
     }
