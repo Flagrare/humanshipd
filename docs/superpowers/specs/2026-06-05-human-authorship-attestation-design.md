@@ -146,19 +146,28 @@ UI non-negotiables (from the project values):
 - "Metadata only — nothing leaves your device" stated in-context.
 - The verify page renders the **nuanced** claim ("incremental human-like process; not altered since T"), **never** a "✓ 100% Human" badge that would overclaim.
 
+#### 7.2.1 Tracked-apps picker (user agency)
+
+The desktop control app surfaces an explicit **list of apps the user can choose to track** — ideally pre-populated from writing apps detected on the machine (e.g. Word, Scrivener, Final Draft), with everything **off by default**. The user opts each app in.
+
+This reframes the scary permission ("this tool can read input") into visible agency ("you chose exactly these apps, and you can see and change the list anytime"). It also enforces the capture allow-list technically: only apps the user enabled are ever observed. A defining feature of the desktop control app, not an afterthought.
+
 ## 8. POC scope (thin vertical slice)
 
-**Build:** Browser extension (Google Docs) → Native Messaging → Rust core → build record → sign + RFC 3161 timestamp → local verify page that validates the badge and shows the claim.
+**Build:** capture adapter → Rust core → build record → sign + RFC 3161 timestamp → verify (badge validated, claim shown).
 
-**Deferred:** OS Accessibility adapter; OCR; full C2PA/CAWG/VC emission; transparency log; zero-knowledge process attestation (research track).
+Because capture is a Strategy (adapters emit a common `EditEvent` stream the core consumes), the *first* capture adapter is interchangeable. **Decision (2026-06-05): build the native macOS Accessibility adapter first** (it's the reusable adapter that also serves Scrivener/Final Draft, keeps the stack Rust-native, and avoids the browser/two-codebase concern). The **Google Docs MV3 extension moves to last.**
 
-**Build sequence:**
-1. Rust core: record schema + canonicalization + hashing + verify (test-first).
-2. Rust core: signing + RFC 3161 client.
-3. Native Messaging host wrapping the core.
-4. MV3 extension: capture Google Docs edit events + paste detection; forward to host.
-5. Verify page/CLI: validate a badge, render the honest claim.
-6. End-to-end test on a real Google Doc.
+**Deferred:** OCR fallback; full C2PA/CAWG/VC emission; transparency log; zero-knowledge process attestation (research track).
+
+**Build sequence (✓ = done):**
+1. ✓ Rust core: record schema + canonicalization + hashing + verify.
+2. ✓ Rust core: signing + time-anchoring (pluggable authority; POC local TSA).
+3. ✓ Native Messaging host wrapping the core + headless `verify_badge` CLI.
+4. **Native macOS capture adapter** (`AXUIElement` text diffs + `CGEventTap` keystroke timing): de-risk on **TextEdit** first, then **Word**. Emits the `EditEvent` stream → core.
+5. WASM verify page (in-browser version of the CLI verifier).
+6. Google Docs MV3 extension (capture via in-page edit events → native messaging).
+7. End-to-end test in each target app.
 
 ## 9. Tech stack
 
