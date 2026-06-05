@@ -93,6 +93,7 @@ The `WritingSessionRecord` contains **no document content** — only counts, tim
     "keyed_fraction": 0.0                                   // typed vs appeared
   },
   "evidence_flags": { "large_unkeyed_insertions": 0 },
+  "replay": { "available": false, "log_sha256": null },    // optional, local-only; hash binds a shared replay to this session (§7.1)
   "integrity": {
     "record_sha256": "<hex>",
     "client_signature": "<sig over record_sha256>",        // forgeable; binds to a key
@@ -119,6 +120,16 @@ Design constraints:
 - Output a **badge** + a **verify page/CLI** that validates a record offline (signature, timestamp, document-hash match) and renders the honest claim text (§4).
 - Schema shaped to map onto a **C2PA manifest + CAWG identity assertion + W3C VC** so the credential can become standards-interoperable later (the gap: CAWG has no "human-authored" role today — a slot this project can help define).
 
+### 7.1 Optional feature: writing replay
+
+The capture layer already produces an ordered edit-event stream, so a Draftback-style **replay** (watch the document being written) is nearly free as a presentation layer. It is included, but deliberately **quarantined from the default credential** because it requires retaining content, which conflicts with the metadata-only posture.
+
+Rules:
+- **Local-only and off by default.** An author may replay *their own* session on their machine; nothing leaves the device.
+- **Opt-in sharing only.** Attaching a replay as supplementary evidence (e.g., student→teacher, author→publisher) is the author's explicit, informed choice to expose content. Never automatic.
+- **Hash-bound.** The replay log's hash (`replay.log_sha256`) is part of the signed record, so the default badge stays content-free, but a *shared* replay can be verified as the genuine, un-doctored session.
+- **No security uplift.** Replay adds persuasiveness to a human viewer, not cryptographic strength: copy-typed text replays as smooth human writing, and "human auto-typers" can manufacture fake replays. Documented as such; never presented as proof.
+
 ## 8. POC scope (thin vertical slice)
 
 **Build:** Browser extension (Google Docs) → Native Messaging → Rust core → build record → sign + RFC 3161 timestamp → local verify page that validates the badge and shows the claim.
@@ -144,7 +155,7 @@ Design constraints:
 - Final brand/name (POC codename: "Authorshipped"/"Humanship"; claim wording locked: **"Human Authored"**).
 - Which public RFC 3161 TSA(s) to default to; whether to ship a transparency-log option in v1.
 - Exact bucketing for burst/pause/revision stats (privacy vs. signal).
-- Whether the extension should store a local replay (Draftback-style) for the author, off by default.
+- (Resolved) Local replay is now a defined optional feature — see §7.1.
 
 ## 11. References
 
