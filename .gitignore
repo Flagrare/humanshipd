@@ -1,0 +1,9 @@
+# Assistant working files (local memory/logs, not project content)
+.remember/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
