@@ -16,11 +16,24 @@ use core_foundation::base::{CFType, CFTypeRef, TCFType};
 use core_foundation::boolean::CFBoolean;
 use core_foundation::dictionary::CFDictionary;
 use core_foundation::string::CFString;
+use std::fs::File;
+use std::io::Write;
 use std::ptr;
 use std::thread::sleep;
 use std::time::Duration;
 
 const POLL_SECONDS: u32 = 20;
+/// When launched as a `.app` (no console), output also goes here.
+const LOG_PATH: &str = "/tmp/humanshipd-axprobe.log";
+
+/// Write a line to stdout and (best-effort) to the log file.
+fn emit(log: &mut Option<File>, line: &str) {
+    println!("{line}");
+    if let Some(file) = log {
+        let _ = writeln!(file, "{line}");
+        let _ = file.flush();
+    }
+}
 
 /// Copy a string attribute, returning the AX error code on failure
 /// (or -99 if the value exists but is not a string).
@@ -74,37 +87,42 @@ fn prompt_for_trust() -> bool {
 }
 
 fn main() {
+    let mut log = File::create(LOG_PATH).ok();
+
     let trusted = prompt_for_trust();
-    println!("AXIsProcessTrusted = {trusted}");
+    emit(&mut log, &format!("AXIsProcessTrusted = {trusted}"));
     if !trusted {
-        println!(
-            "→ A permission dialog should have appeared. Grant Accessibility to your\n\
-             terminal app (or target/debug/humanshipd-macos-capture), then re-run."
+        emit(
+            &mut log,
+            "→ A permission dialog should have appeared. Grant Accessibility to this\n\
+             app, then launch it again.",
         );
     }
-    println!("\nPolling {POLL_SECONDS}s — click into TextEdit, then Word, and type:\n");
+    emit(
+        &mut log,
+        &format!("\nPolling {POLL_SECONDS}s — click into TextEdit, then Word, and type:\n"),
+    );
 
     for tick in 0..POLL_SECONDS {
-        match copy_focused_element() {
+        let line = match copy_focused_element() {
             Ok(element) => {
                 let role = copy_string(element, "AXRole").unwrap_or_else(|e| format!("<err {e}>"));
                 match copy_string(element, "AXValue") {
-                    Ok(text) => println!(
+                    Ok(text) => format!(
                         "[{tick:>2}s] role={role} value={} chars | {}",
                         text.chars().count(),
                         preview(&text)
                     ),
                     Err(value_err) => {
                         let selected = copy_string(element, "AXSelectedText").ok();
-                        println!(
-                            "[{tick:>2}s] role={role} AXValue err={value_err} selected={selected:?}"
-                        );
+                        format!("[{tick:>2}s] role={role} AXValue err={value_err} selected={selected:?}")
                     }
                 }
             }
-            Err(e) => println!("[{tick:>2}s] no focused element (AXError {e})"),
-        }
+            Err(e) => format!("[{tick:>2}s] no focused element (AXError {e})"),
+        };
+        emit(&mut log, &line);
         sleep(Duration::from_secs(1));
     }
-    println!("\nDone.");
+    emit(&mut log, &format!("\nDone. (log written to {LOG_PATH})"));
 }
