@@ -334,5 +334,5 @@ Is it feasible to build a platform-agnostic, minimally-intrusive, privacy-respec
 ## Downstream uses
 
 - Feasibility assessment delivered to founder (chat), 2026-06-05.
-- Forthcoming design spec in `docs/superpowers/specs/` — cross-link to be added.
+- Design spec: [`docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`](../superpowers/specs/2026-06-05-human-authorship-attestation-design.md).
 - Branding/naming decision: see [`2026-06-05-human-authorship-label-framing.md`](./2026-06-05-human-authorship-label-framing.md).

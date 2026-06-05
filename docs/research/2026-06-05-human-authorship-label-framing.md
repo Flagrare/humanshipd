@@ -108,4 +108,4 @@ For a tool that substantiates human authorship of text, which label framing carr
 ## Downstream uses
 
 - Naming/positioning recommendation delivered to founder (chat), 2026-06-05.
-- Forthcoming design spec in `docs/superpowers/specs/` — claim wording and badge naming.
+- Design spec (claim wording "Human Authored", §4/§7; naming §10): [`docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`](../superpowers/specs/2026-06-05-human-authorship-attestation-design.md).

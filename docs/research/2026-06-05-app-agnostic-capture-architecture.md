@@ -137,4 +137,4 @@ Is an app-agnostic, OS-level capture layer feasible that observes a user's writi
 ## Downstream uses
 
 - Capture-layer recommendation delivered to founder (chat), 2026-06-05.
-- Forthcoming design spec in `docs/superpowers/specs/` — capture architecture section.
+- Design spec (capture architecture §3): [`docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`](../superpowers/specs/2026-06-05-human-authorship-attestation-design.md).
