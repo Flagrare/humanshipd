@@ -8,3 +8,6 @@ description = "Native macOS Accessibility capture adapter for humanshipd (probe 
 [dependencies]
 core-foundation = "0.10"
 accessibility-sys = "0.1"
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
