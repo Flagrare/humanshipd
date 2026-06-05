@@ -9,11 +9,13 @@ pub mod canonical;
 pub mod error;
 pub mod record;
 pub mod signing;
+pub mod timestamp;
 
-pub use badge::{sign_record, verify_badge_signature, Badge, Integrity};
+pub use badge::{anchor_badge, sign_record, verify_badge_signature, Badge, Integrity};
 pub use error::CoreError;
 pub use record::{
     BurstStats, DocumentBinding, EvidenceFlags, PauseStats, ProcessStats, Replay, RevisionStats,
     Surface, UnkeyedInsertion, WritingSessionRecord, SCHEMA,
 };
 pub use signing::{verify_signature, KeyPair};
+pub use timestamp::{verify_timestamp, LocalTsa, TimestampAuthority, TimestampToken};

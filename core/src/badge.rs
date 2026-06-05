@@ -2,6 +2,7 @@ use crate::canonical::{canonicalize, sha256_hex};
 use crate::error::CoreError;
 use crate::record::WritingSessionRecord;
 use crate::signing::{verify_signature, KeyPair};
+use crate::timestamp::{TimestampAuthority, TimestampToken};
 use serde::{Deserialize, Serialize};
 
 /// A signed, verifiable credential: the record plus its integrity block.
@@ -22,8 +23,9 @@ pub struct Integrity {
     pub public_key: String,
     /// Hex Ed25519 signature over the canonical record bytes.
     pub client_signature: String,
-    /// RFC 3161 timestamp token (base64), added by the trust-anchor step.
-    pub rfc3161_token: Option<String>,
+    /// Time-anchoring token over `record_sha256`, added by the trust-anchor step.
+    /// `None` until anchored. (POC token; see [`TimestampToken`].)
+    pub timestamp: Option<TimestampToken>,
 }
 
 /// Sign a record, producing a badge with no timestamp yet (added later).
@@ -34,10 +36,21 @@ pub fn sign_record(record: WritingSessionRecord, keypair: &KeyPair) -> Result<Ba
             record_sha256: sha256_hex(&canonical),
             public_key: keypair.public_key_hex(),
             client_signature: keypair.sign_hex(&canonical),
-            rfc3161_token: None,
+            timestamp: None,
         },
         record,
     })
+}
+
+/// Anchor a signed badge in time by attaching a timestamp token over its
+/// `record_sha256` from the given authority (Strategy: local POC or real RFC 3161).
+pub fn anchor_badge(
+    mut badge: Badge,
+    authority: &impl TimestampAuthority,
+) -> Result<Badge, CoreError> {
+    let token = authority.timestamp(&badge.integrity.record_sha256)?;
+    badge.integrity.timestamp = Some(token);
+    Ok(badge)
 }
 
 /// Verify the signature leg of a badge: the stored hash must match the
