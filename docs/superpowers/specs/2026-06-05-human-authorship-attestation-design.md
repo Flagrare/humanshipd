@@ -130,6 +130,22 @@ Rules:
 - **Hash-bound.** The replay log's hash (`replay.log_sha256`) is part of the signed record, so the default badge stays content-free, but a *shared* replay can be verified as the genuine, un-doctored session.
 - **No security uplift.** Replay adds persuasiveness to a human viewer, not cryptographic strength: copy-typed text replays as smooth human writing, and "human auto-typers" can manufacture fake replays. Documented as such; never presented as proof.
 
+### 7.2 UI surfaces
+
+Four surfaces; the POC needs only the first two. The UI is part of the trust story — it must make the privacy guarantees visible and must never overclaim.
+
+| Surface | Role | Phase |
+|---|---|---|
+| **Extension popup** | Capture status (recording/idle, current doc), an always-visible capture indicator + one-click pause, and an explicit **"Issue Human Authored credential"** button | POC |
+| **Verify page** | Static page; drop in a badge/record → render the honest claim + pass/fail. Verification runs **in-browser via the Rust core compiled to WASM** — no server, content never leaves | POC |
+| **Desktop control app** | Menu-bar/tray: status, pause, permissions + allow-list for the OS-Accessibility adapter. Built in **Tauri** (Rust-native, wraps the same core) | Phase 2 |
+| **Replay viewer** | Local Draftback-style player (§7.1) | Phase 2 |
+
+UI non-negotiables (from the project values):
+- Always-visible capture indicator + one-click pause (not a covert keylogger).
+- "Metadata only — nothing leaves your device" stated in-context.
+- The verify page renders the **nuanced** claim ("incremental human-like process; not altered since T"), **never** a "✓ 100% Human" badge that would overclaim.
+
 ## 8. POC scope (thin vertical slice)
 
 **Build:** Browser extension (Google Docs) → Native Messaging → Rust core → build record → sign + RFC 3161 timestamp → local verify page that validates the badge and shows the claim.
