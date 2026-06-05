@@ -1,0 +1,10 @@
+[package]
+name = "humanshipd-macos-capture"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+description = "Native macOS Accessibility capture adapter for humanshipd (probe stage)."
+
+[dependencies]
+core-foundation = "0.10"
+accessibility-sys = "0.1"
