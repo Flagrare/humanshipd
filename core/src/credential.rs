@@ -65,6 +65,13 @@ fn issue_with_context(
     Ok(dest.into_inner())
 }
 
+// NOTE (next task): a truly detached manifest over the text hash is blocked by a
+// c2pa-rs limitation — `data_hashed_placeholder("text/plain")` returns
+// "type is unsupported" (no text format handler). The detached path needs a
+// custom c2pa format handler or a BoxHash approach. The text binding meanwhile
+// lives in the record's `document_binding.final_text_sha256` (set by build_record),
+// which a verifier re-checks against the supplied text. See research catalog.
+
 /// Verification outcome from reading a signed manifest.
 pub struct CredentialReadout {
     /// True if the C2PA signature + bindings validate (Valid or Trusted).

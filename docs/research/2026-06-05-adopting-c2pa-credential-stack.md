@@ -68,7 +68,12 @@ Which concrete standards and maintained Rust SDKs should humanshipd build the cr
 
 **Accepted tradeoffs:** (1) c2pa-rs signing needs an **X.509 cert chain**, not a bare Ed25519 key — for local trust we generate a self-signed chain; the fork-and-forge honesty (open-source local issuance) is unchanged. (2) c2pa-rs is a **heavy dependency** vs the ~200-line bespoke core — accepted because **interoperability with the C2PA/Content-Credentials ecosystem (Authors Guild, CAI tooling) IS the value proposition** for a human-authorship credential; this is the one place where the standard's weight is justified (unlike the capture layer, where we keep deps lean).
 
+## Implementation findings (2026-06-05)
+
+- **C2PA adoption proven:** `core::credential` issues + verifies via c2pa-rs — process record as the `org.humanshipd.process` custom assertion, signed with `EphemeralSigner` (self-signed, valid-but-untrusted; fits the honest local model), verified by `Reader`. Tests: round-trip + asset-tamper detection. (Note: c2pa strips a trailing `.vN` from assertion labels, so the label is `org.humanshipd.process`, not `…​.v1`.)
+- **Detached-over-text is blocked by a real c2pa gap:** `Builder::data_hashed_placeholder("text/plain")` returns **`"type is unsupported"`** — c2pa's data-hash binding is format-specific and has **no text handler**. So a standalone `.c2pa` over `sha256(text)` can't be produced via the Builder data-hash API today. **Next-task options:** (a) register a custom c2pa format handler for our text type; (b) use the **BoxHash** path; or (c) interim — bind the text via the record's `document_binding.final_text_sha256` (set by `build_record`) and have the verifier recompute `sha256(text)` and compare, while the C2PA manifest provides the signed envelope. The embed-in-carrier path is proven; the format-agnostic detached path is the open item.
+
 ## Downstream uses
 
-- Refactor of `core` (replace badge/signing/timestamp with c2pa-rs). 
+- Refactor of `core`: `credential.rs` (c2pa-rs) added; bespoke `badge/signing/timestamp` to be removed once host+capture call `credential`. 
 - Design spec §6/§7/§9 updates.
