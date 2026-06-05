@@ -6,6 +6,7 @@ External research conducted for this project. Each entry credits the sources it 
 
 | Date | Topic | Triggered by | Informed |
 |------|-------|--------------|----------|
+| 2026-06-05 | [Adopting C2PA + Standards for the Credential Stack](./2026-06-05-adopting-c2pa-credential-stack.md) | Directive to adopt standards, not reinvent | Refactor core to c2pa-rs; spec §6/§7/§9 |
 | 2026-06-05 | [App-Agnostic, On-Device Capture Architecture](./2026-06-05-app-agnostic-capture-architecture.md) | "Blend into any app" capture requirement (Cluely-class) | Capture-layer design; forthcoming spec |
 | 2026-06-05 | [Positive vs. Negative Framing of a Human-Authorship Label](./2026-06-05-human-authorship-label-framing.md) | Naming/badge framing decision (AI-Free vs Human Authored) | Naming recommendation; forthcoming design spec |
 | 2026-06-05 | [Feasibility of Proving Human Authorship of Text](./2026-06-05-proof-of-human-authorship-feasibility.md) | Scoping the "synthy-free" / "Authorshipped" concept | Feasibility verdict; forthcoming design spec |

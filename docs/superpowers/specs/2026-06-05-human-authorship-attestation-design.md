@@ -169,11 +169,24 @@ Because capture is a Strategy (adapters emit a common `EditEvent` stream the cor
 6. Google Docs MV3 extension (capture via in-page edit events → native messaging).
 7. End-to-end test in each target app.
 
-## 9. Tech stack
+## 9. Tech stack — adopt standards, don't reinvent
 
-- **Core:** Rust (single reusable implementation; strong crypto + RFC 3161 ecosystem; the official C2PA lib is Rust; reusable by future native adapters).
-- **Extension:** TypeScript, MV3, thin tap over Native Messaging. (Type drift avoided via generated types if/when the extension needs core types.)
-- **License:** permissive (MIT/Apache) — reuse screenpipe *patterns*, not GPL code.
+Principle: engineering effort goes to the value proposition (human-authorship attestation). Everything underneath builds on the canonical standard + its reference OSS. See research [`adopting-c2pa-credential-stack`](../../research/2026-06-05-adopting-c2pa-credential-stack.md) and [`app-agnostic-capture-architecture`](../../research/2026-06-05-app-agnostic-capture-architecture.md).
+
+**Credential / provenance — adopt C2PA, do not hand-roll an envelope:**
+- **`c2pa` (c2pa-rs 0.85)** — the credential is a **C2PA manifest**: our process record is a custom assertion `org.humanshipd.process.v1`; COSE/X.509 claim signature (ed25519); **built-in RFC 3161** timestamp via `tsa_url`; emitted as a **detached `.c2pa` sidecar** over the final-text SHA-256 (no native text handler, and matches our hash-only model). `Reader` does verification.
+- **CAWG identity assertion** (`c2pa::identity`) — binds the named human author (`cawg.creator`); "human-authored" semantics via `digitalSourceType` + our custom assertion (claim semantics stay ours).
+- **Deferred / opt-in:** W3C VC (`ssi`) — CAWG VC integration spec not yet stable; Sigstore **Rekor** (`sigstore-rekor`) — optional public anchoring (network, off by default).
+- **Stays bespoke (no standard exists):** the process-metadata schema and the honest claim/threshold semantics.
+- **Tradeoff accepted:** c2pa-rs is heavy, but interop with the C2PA / Authors-Guild ecosystem *is* the value — the one place a heavy standard is justified.
+
+**Capture — adopt established AX libraries, keep deps lean (auditable attack surface):**
+- **macOS:** `accessibility-sys` + `accessibility` crates with **event-driven `AXObserver` + CFRunLoop** (not raw FFI + polling). Resolve focused text via `AXFocusedUIElement`, descending containers (Word's `AXSplitGroup`/`AXScrollArea`) to `AXTextArea`. **Do not** vendor screenpipe (its capture is a committed binary and the approach is deprecated upstream).
+- **Windows (later):** `uiautomation`. **Linux (later):** `atspi`. Both are the mature standard adoption targets.
+
+**Frontend:** Extension in TypeScript, MV3, thin tap over Native Messaging. Desktop app (Phase 2) in Tauri (wraps the same core).
+
+**License:** permissive (MIT/Apache).
 
 ## 10. Open questions (to resolve during build)
 
