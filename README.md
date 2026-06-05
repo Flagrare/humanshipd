@@ -48,7 +48,7 @@ The simplest is a **sidecar file** — a small `.c2pa` companion that travels ne
 
 For plain text that needs to carry its proof *inside itself*, the credential can be woven into the text as **invisible characters** (a method defined in the C2PA standard using non-printing Unicode marks). The text looks identical and survives copy-paste, but now carries its own certificate. The encoder for this is built and tested.
 
-The most durable approach — still on the roadmap — adds a **content fingerprint** (using ISCC, an ISO-standard "content code" that recognizes a document even after light edits or reformatting) plus a lookup service, so a stripped-down copy can still be matched back to its certificate. This is the only piece that would involve a server, and even then it only ever sees fingerprints.
+The most durable approach adds a **content fingerprint** (using ISCC, an ISO-standard "content code" that recognizes a document even after light edits or reformatting) plus an opt-in lookup service, so a stripped-down copy can still be matched back to its certificate. The fingerprint is now built into every credential; the lookup service is the only piece that involves a server, and even then it only ever sees fingerprints, never your text.
 
 ## Architecture
 
@@ -71,9 +71,9 @@ The **core** is written in Rust and contains the entire credential format, signi
 
 This is an early, honest preview — the foundation is real and tested, the consumer-facing apps are not finished.
 
-**Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, and embedding a credential invisibly in text. A native-messaging host that lets a browser extension talk to the core. A macOS capture probe that confirms we can read live text from TextEdit and Word.
+**Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, embedding a credential invisibly in text, and computing the ISCC durable fingerprint. An opt-in registry service for fingerprint → credential lookup. A native-messaging host that lets a browser extension talk to the core. A macOS capture probe that confirms we can read live text from TextEdit and Word.
 
-**Not built yet:** the polished browser extension and on-screen capture UI, an in-browser verification page, named-author identity, and the durable fingerprint + lookup service.
+**Not built yet:** the polished browser extension and on-screen capture UI, an in-browser verification page, and named-author identity (a cryptographically attested human author).
 
 To go deeper:
 
