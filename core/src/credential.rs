@@ -96,6 +96,16 @@ pub fn issue_sidecar(
         }))
         .map_err(c2pa_err)?;
 
+    // Durable (soft) binding: an ISCC content fingerprint over the text, so a
+    // reformatted/lightly-edited copy can still be matched back to this credential.
+    if let Ok(text) = std::str::from_utf8(file_bytes) {
+        if let Some(soft_binding) = crate::fingerprint::text_soft_binding(text) {
+            builder
+                .add_assertion("c2pa.soft-binding", &soft_binding)
+                .map_err(c2pa_err)?;
+        }
+    }
+
     builder
         .data_hashed_placeholder(signer.reserve_size(), MANIFEST_STORE_FORMAT)
         .map_err(c2pa_err)?;

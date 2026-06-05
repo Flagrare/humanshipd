@@ -8,6 +8,7 @@
 pub mod canonical;
 pub mod credential;
 pub mod error;
+pub mod fingerprint;
 pub mod record;
 pub mod session;
 pub mod text_embed;

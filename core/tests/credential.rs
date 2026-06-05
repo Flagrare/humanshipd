@@ -28,6 +28,23 @@ fn sidecar_credential_round_trips_and_binds_to_file() {
 }
 
 #[test]
+fn sidecar_credential_carries_an_iscc_soft_binding() {
+    let file = "A reasonably long original document, several sentences long, so that \
+        an ISCC text code can be derived for the durable soft binding."
+        .as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(file);
+
+    let manifest = credential::issue_sidecar(&record, file).expect("issue");
+    let as_text = String::from_utf8_lossy(&manifest);
+    assert!(
+        as_text.contains("io.iscc.v0"),
+        "credential should carry an ISCC soft binding"
+    );
+    assert!(credential::read_sidecar(&manifest, file).unwrap().valid);
+}
+
+#[test]
 fn sidecar_credential_rejects_a_different_file() {
     let file = b"original exported file";
     let mut record = sample_record();
