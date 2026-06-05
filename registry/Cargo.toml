@@ -1,0 +1,15 @@
+[package]
+name = "humanshipd-registry"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+description = "Opt-in lookup service mapping a content fingerprint (ISCC) to its credential. Stores fingerprints + credentials only — never document content."
+
+[lib]
+name = "humanshipd_registry"
+
+[dependencies]
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "macros"] }
+serde = { version = "1", features = ["derive"] }
+base64 = "0.22"
