@@ -8,10 +8,16 @@
 //! untrusted), which matches the honest local-issuance model. Production swaps in
 //! a real cert chain via `Context::with_settings`.
 
+use crate::canonical::sha256_hex;
 use crate::error::CoreError;
 use crate::record::WritingSessionRecord;
-use c2pa::{Builder, Context, EphemeralSigner, Reader, ValidationState};
+use c2pa::assertions::DataHash;
+use c2pa::{Builder, Context, EphemeralSigner, Reader, Signer, ValidationState};
+use sha2::{Digest, Sha256};
 use std::io::Cursor;
+
+/// MIME for a standalone C2PA manifest store (the sidecar/external-manifest form).
+const MANIFEST_STORE_FORMAT: &str = "application/c2pa";
 
 /// Reverse-DNS label for our process-metadata assertion.
 /// (No `.vN` suffix — c2pa interprets that as an assertion version and strips it.)
@@ -65,12 +71,73 @@ fn issue_with_context(
     Ok(dest.into_inner())
 }
 
-// NOTE (next task): a truly detached manifest over the text hash is blocked by a
-// c2pa-rs limitation — `data_hashed_placeholder("text/plain")` returns
-// "type is unsupported" (no text format handler). The detached path needs a
-// custom c2pa format handler or a BoxHash approach. The text binding meanwhile
-// lives in the record's `document_binding.final_text_sha256` (set by build_record),
-// which a verifier re-checks against the supplied text. See research catalog.
+/// Issue a **standalone (sidecar) `.c2pa` credential** bound to `file_bytes` by a
+/// data hash (the first-class, format-agnostic Layer-1 path). The credential is a
+/// manifest store carrying the process record + `c2pa.created` action; it binds to
+/// the exported file by `sha256(file_bytes)` without storing the file.
+pub fn issue_sidecar(
+    record: &WritingSessionRecord,
+    file_bytes: &[u8],
+) -> Result<Vec<u8>, CoreError> {
+    let signer = EphemeralSigner::new("humanshipd.local").map_err(c2pa_err)?;
+    let mut builder = Builder::from_context(Context::new())
+        .with_definition(serde_json::json!({
+            "title": "Human Authored credential",
+            "claim_generator_info": [{ "name": "humanshipd", "version": env!("CARGO_PKG_VERSION") }]
+        }))
+        .map_err(c2pa_err)?;
+    builder
+        .add_assertion(PROCESS_ASSERTION, record)
+        .map_err(c2pa_err)?;
+    builder
+        .add_action(serde_json::json!({
+            "action": "c2pa.created",
+            "digitalSourceType": DIGITAL_CAPTURE
+        }))
+        .map_err(c2pa_err)?;
+
+    builder
+        .data_hashed_placeholder(signer.reserve_size(), MANIFEST_STORE_FORMAT)
+        .map_err(c2pa_err)?;
+
+    let mut data_hash = DataHash::new("humanshipd.file", "sha256");
+    data_hash.set_hash(Sha256::digest(file_bytes).to_vec());
+
+    builder
+        .sign_data_hashed_embeddable(&signer, &data_hash, MANIFEST_STORE_FORMAT)
+        .map_err(c2pa_err)
+}
+
+/// Read a standalone sidecar credential and re-bind it to `file_bytes`: validates
+/// the C2PA signature, extracts the process record, and confirms the bound hash
+/// matches `sha256(file_bytes)`.
+pub fn read_sidecar(
+    manifest: &[u8],
+    file_bytes: &[u8],
+) -> Result<CredentialReadout, CoreError> {
+    let reader = Reader::from_context(Context::new())
+        .with_manifest_data_and_stream(
+            manifest,
+            MANIFEST_STORE_FORMAT,
+            Cursor::new(file_bytes.to_vec()),
+        )
+        .map_err(c2pa_err)?;
+    let signature_ok = matches!(
+        reader.validation_state(),
+        ValidationState::Valid | ValidationState::Trusted
+    );
+    let manifest_obj = reader
+        .active_manifest()
+        .ok_or_else(|| CoreError::Crypto("no active manifest".to_string()))?;
+    let record = manifest_obj
+        .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
+        .map_err(c2pa_err)?;
+    let hash_ok = record.document_binding.final_text_sha256 == sha256_hex(file_bytes);
+    Ok(CredentialReadout {
+        valid: signature_ok && hash_ok,
+        record,
+    })
+}
 
 /// Verification outcome from reading a signed manifest.
 pub struct CredentialReadout {
