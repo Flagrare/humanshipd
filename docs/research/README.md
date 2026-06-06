@@ -6,6 +6,7 @@ External research conducted for this project. Each entry credits the sources it 
 
 | Date | Topic | Triggered by | Informed |
 |------|-------|--------------|----------|
+| 2026-06-06 | [Capturing the Google Docs Writing Process in the Browser](./2026-06-06-google-docs-writing-capture.md) | Make Google Docs the "smoking gun" browser-capture target | Capture-fidelity spec §4; Docs adapter spike |
 | 2026-06-06 | [Competitive Landscape of Authorship / Provenance / Detection Tools](./2026-06-06-competitive-landscape-authorship-tools.md) | "Research what other tools do; integrate the best parts" | Signals/reporting spec §8/§9/§10 |
 | 2026-06-06 | [AI-vs-Human Authorship Signals and Honest Probability Bands](./2026-06-06-ai-authorship-signals-and-probability-bands.md) | Grammarly-style banded report; "what signals estimate AI probability" | Signal taxonomy; provenance-vs-inference; spec §4/§5 |
 | 2026-06-05 | [Adopting C2PA + Standards for the Credential Stack](./2026-06-05-adopting-c2pa-credential-stack.md) | Directive to adopt standards, not reinvent | Refactor core to c2pa-rs; spec §6/§7/§9 |
