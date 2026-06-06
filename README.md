@@ -32,7 +32,9 @@ Five steps turn an act of writing into a checkable certificate.
 
 ## Try it
 
-Nothing is packaged for download yet, but the whole loop runs from the repo. To see it end-to-end without typing a word, generate a demo credential and open the in-browser verifier (you'll need Rust and [`wasm-pack`](https://rustwasm.github.io/wasm-pack/)):
+The fastest way to see what a credential looks like: open the **hosted validator at [flagrare.github.io/humanshipd](https://flagrare.github.io/humanshipd/)** and click **Load a demo credential**. It verifies a bundled example entirely in your browser — nothing is uploaded, even though the page is served from GitHub Pages. You can also download the [example credential](web-verify/examples/credential.c2pa) and [document](web-verify/examples/document.txt) to try the drag-in flow yourself.
+
+To run the whole loop locally from source instead — generating your own demo credential and serving the verifier (you'll need Rust and [`wasm-pack`](https://rustwasm.github.io/wasm-pack/)):
 
 ```bash
 # 1. generate a demo credential and the document it's bound to

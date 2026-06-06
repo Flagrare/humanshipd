@@ -1,0 +1,62 @@
+name: CI & Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test & clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: System deps (OpenSSL for c2pa native build)
+        run: sudo apt-get update && sudo apt-get install -y libssl-dev pkg-config
+      - uses: Swatinem/rust-cache@v2
+      # macos-capture is macOS-only (Accessibility APIs); a Linux matrix can't build it.
+      - run: cargo test --workspace --exclude humanshipd-macos-capture
+      - run: cargo clippy --workspace --exclude humanshipd-macos-capture --all-targets -- -D warnings
+
+  deploy-verifier:
+    name: build & deploy verify page
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the WASM verifier
+        working-directory: web-verify
+        run: wasm-pack build --target web --out-dir pkg
+      - name: Assemble the static site
+        run: |
+          mkdir -p _site/pkg
+          cp web-verify/verify.html _site/index.html
+          cp web-verify/pkg/*.js web-verify/pkg/*.wasm _site/pkg/
+          cp -r web-verify/examples _site/examples
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

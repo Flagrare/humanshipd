@@ -9,6 +9,8 @@
       p.note { color: #555; }
       label { display: block; margin: 14px 0 4px; font-weight: 600; }
       button { margin-top: 18px; padding: 9px 16px; font-size: 15px; cursor: pointer; }
+      p.demo-line { color: #555; font-size: 14px; }
+      button.link { margin: 0; padding: 0; font-size: inherit; background: none; border: none; color: #1a73e8; text-decoration: underline; cursor: pointer; }
       #result { margin-top: 22px; padding: 16px; border-radius: 8px; display: none; }
       #result.valid { background: #e6f4ea; border: 1px solid #137333; }
       #result.invalid { background: #fce8e6; border: 1px solid #b3261e; }
@@ -60,7 +62,15 @@
     <h1>Verify a Human Authored credential</h1>
     <p class="note">
       Everything runs in your browser — the document and credential never leave this
-      page. Verification uses the exact same engine as the command-line tool.
+      page. This page is static: there's no backend even when it's hosted on GitHub
+      Pages, so your files are read locally and never uploaded. Verification uses the
+      exact same engine as the command-line tool.
+    </p>
+
+    <p class="demo-line">
+      First time here? <button id="demo" class="link" type="button">Load a demo credential</button>,
+      or download the <a href="./examples/credential.c2pa" download>example credential</a>
+      and <a href="./examples/document.txt" download>document</a> to try the upload flow yourself.
     </p>
 
     <label for="credential">Credential (<code>.c2pa</code>)</label>
@@ -430,6 +440,19 @@
           return;
         }
         render(verify_credential(credential, doc));
+      });
+
+      // Load the bundled example pair and verify it directly — no upload needed.
+      document.getElementById("demo").addEventListener("click", async () => {
+        try {
+          const [credential, doc] = await Promise.all([
+            fetch("./examples/credential.c2pa").then((r) => r.arrayBuffer()),
+            fetch("./examples/document.txt").then((r) => r.arrayBuffer()),
+          ]);
+          render(verify_credential(new Uint8Array(credential), new Uint8Array(doc)));
+        } catch {
+          alert("Could not load the demo files — serve this page over http(s), not file://.");
+        }
       });
     </script>
   </body>
