@@ -2,7 +2,7 @@
 
 - **Date:** 2026-06-06
 - **Status:** draft (awaiting user review)
-- **Companion to:** [`2026-06-05-human-authorship-attestation-design.md`](./2026-06-05-human-authorship-attestation-design.md) — that spec defines the architecture, threat model, credential format, and POC. **This** spec defines *what we measure*, *how we report it honestly*, and *which competitor features we adopt and when*.
+- **Companion to:** [`2026-06-05-human-authorship-attestation-design.md`](./2026-06-05-human-authorship-attestation-design.md) — that spec defines the architecture, threat model, credential format, and POC. **This** spec defines *what we measure*, *how we report it honestly*, and *which competitor features we adopt and when*. See also [`2026-06-06-content-binding-and-capture-fidelity-design.md`](./2026-06-06-content-binding-and-capture-fidelity-design.md) for *which editors we can read* and *which document formats verify*.
 - **Research basis:** [`docs/research/2026-06-06-ai-authorship-signals-and-probability-bands.md`](../../research/2026-06-06-ai-authorship-signals-and-probability-bands.md) and the four competitive-landscape research threads of 2026-06-06 (catalogued in `docs/research/`).
 
 ## 1. Summary
