@@ -65,15 +65,15 @@ One piece holds all the logic that matters; everything else is a thin shell arou
                                  └──────────────────────┘
 ```
 
-The **core** is written in Rust and contains the entire credential format, signing, and verification — so a credential made by one capture method is byte-for-byte identical to one made by another. The capture methods are deliberately thin: a **browser extension** for Google Docs and web editors (planned), and a **macOS Accessibility adapter** for native apps like Word and Scrivener (the reading approach is proven; the full adapter is in progress). Where an app exposes nothing else, screenshots with on-device text recognition are the last-resort fallback.
+The **core** is written in Rust and contains the entire credential format, signing, and verification, so a credential made by one capture method is byte-for-byte identical to one made by another. Because that core — along with the host and the registry — is plain Rust with no OS-specific code, it builds and runs on macOS, Windows, and Linux alike; only the capture adapters are platform-specific. Those adapters are deliberately thin: a **macOS Accessibility adapter** for native apps like Word and Scrivener is built today and runs the whole slice; a **browser extension** for Google Docs and web editors, plus **Windows** (UI Automation) and **Linux** (AT-SPI) adapters, are planned. Where an app exposes nothing else, screenshots with on-device text recognition are the last-resort fallback.
 
 ## Project status
 
 This is an early, honest preview — the foundation is real and tested, the consumer-facing apps are not finished.
 
-**Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, embedding a credential invisibly in text, and computing the ISCC durable fingerprint. An opt-in registry service for fingerprint → credential lookup. A native-messaging host that lets a browser extension talk to the core. A macOS capture probe that confirms we can read live text from TextEdit and Word.
+**Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, embedding a credential invisibly in text, and computing the ISCC durable fingerprint. An opt-in registry service for fingerprint → credential lookup, with end-to-end recovery proven. A native-messaging host that lets a browser extension talk to the core. And a **macOS capture tool** that runs the whole slice for real: it reads your live typing in TextEdit or Word, builds the record, issues a signed credential bound to the document, and verifies it — writing both the credential and the document so you can check them independently. The entire workspace builds on macOS, Windows, and Linux.
 
-**Not built yet:** the polished browser extension and on-screen capture UI, an in-browser verification page, and named-author identity (a cryptographically attested human author).
+**Not built yet:** the browser-extension and Windows/Linux capture adapters, an on-screen capture UI, an in-browser verification page, and named-author identity (a cryptographically attested human author).
 
 To go deeper:
 
