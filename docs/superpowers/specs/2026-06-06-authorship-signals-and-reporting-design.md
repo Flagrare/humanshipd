@@ -193,9 +193,12 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 - ✅ Surfaced in the verify page (banded report rendered from the validated record; shown only when valid).
 - *Remaining:* surface the report in the extension popup; offset-based spans + `source`/`ai_tool` once adapters emit position and origin.
 
-**Phase 2 — Content-free visualization. ◧ in progress.**
-- ✅ Writing fingerprint graph: a content-free `timeline` (document length over time; schema `@0.3`) derived in `build_record`, rendered on the verify page as an SVG where pastes are vertical jumps and deletions are dips (§7.1–7.2).
-- *Remaining:* true per-edit document offsets (revisit visualization) once adapters capture caret position; paste timeline with jump-to-paste markers; scrubber + speed-control replay.
+**Phase 2 — Content-free visualization. ✅ shipped.**
+- ✅ Writing fingerprint graph: a content-free `timeline` (schema `@0.4`) derived in `build_record`, rendered on the verify page as an SVG (§7.1–7.2).
+- ✅ Per-edit caret offsets captured through the pipeline (`EditEvent.at_offset` → `TimelinePoint.offset`): extension via `selectionStart`, macOS via text prefix-diff, native-host DTO passthrough. The graph plots true **edit position over time** when offsets are present (revisits dip back down), else falls back to length.
+- ✅ Paste timeline with jump-to-paste markers.
+- ✅ Scrubber + speed-control structural replay (progressive reveal; content-free geometry).
+- *Remaining (later):* per-contributor attribution; opt-in glyph-level local replay (§7.4).
 
 **Phase 3 — Process-shape corroboration (Tier 2, clearly bounded).**
 - P-burst/R-burst + pause-location analysis surfaced as a *corroborating* "human-like process" indicator with its stated error band — never as identity or anti-AI proof.

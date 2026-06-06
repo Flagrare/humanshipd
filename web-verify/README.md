@@ -34,11 +34,13 @@ Pick a credential (`.c2pa`) and the document it should belong to, click **Verify
 and the page shows the verdict, the claim, the bound document hash, the count of
 flagged un-keyed (paste) insertions, a **banded provenance report** — word-count
 proportions of how the text entered (typed / pasted / not captured) with a coarse
-summary — and a **writing fingerprint graph**: document length over time, where a
-paste shows as a vertical jump and a deletion as a dip (content-free; built from
-counts and timestamps only). The bands describe *provenance*, not a guess about
-whether the text is AI-written, and the report and graph appear only when the
-credential is valid for the document.
+summary — and a **writing fingerprint graph**: edit position over time when the credential
+carries per-edit offsets (a paste is a vertical jump, a revisit to earlier text
+dips back down), falling back to document length otherwise. The graph has a
+**scrubbable replay** (play/pause, speed) and **jump-to-paste markers**, all
+content-free (offsets, counts, timestamps — never text). The bands describe
+*provenance*, not a guess about whether the text is AI-written, and the report and
+graph appear only when the credential is valid for the document.
 
 To generate a fixture for manual testing:
 
