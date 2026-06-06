@@ -20,7 +20,8 @@ pub use credential::{
 pub use error::CoreError;
 pub use record::{
     BurstStats, DocumentBinding, EvidenceFlags, PauseStats, ProcessStats, Provenance,
-    ProvenanceSpan, Replay, RevisionStats, Surface, UnkeyedInsertion, WritingSessionRecord, SCHEMA,
+    ProvenanceSpan, Replay, RevisionStats, Surface, TimelinePoint, UnkeyedInsertion,
+    WritingSessionRecord, SCHEMA,
 };
 pub use report::{render_report, NuanceSummary, ProvenanceReport, ReportBand};
 pub use fingerprint::{text_iscc, text_soft_binding, SoftBinding, ISCC_ALG};

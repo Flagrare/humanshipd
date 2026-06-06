@@ -5,6 +5,8 @@ use crate::record::*;
 pub const PAUSE_THRESHOLD_MS: u64 = 2000;
 /// An un-keyed insertion at least this many chars is "large" (paste/AI-dump signal).
 pub const LARGE_UNKEYED_THRESHOLD: u64 = 20;
+/// Cap the timeline so the credential stays small; longer sessions are stride-sampled.
+pub const MAX_TIMELINE_POINTS: usize = 300;
 
 /// Raw capture input from an adapter. `final_text` is used only to compute the
 /// document hash + char count; it is **never** copied into the record.
@@ -70,6 +72,7 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
 
     let (pauses, bursts) = pauses_and_bursts(events);
     let spans = build_spans(events);
+    let timeline = build_timeline(events);
 
     WritingSessionRecord {
         schema: SCHEMA.to_string(),
@@ -91,6 +94,7 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
             insertions_without_keystrokes,
             keyed_fraction,
             spans,
+            timeline,
         },
         evidence_flags: EvidenceFlags {
             large_unkeyed_insertions,
@@ -128,6 +132,40 @@ fn build_spans(events: &[EditEvent]) -> Vec<ProvenanceSpan> {
         }
     }
     spans
+}
+
+/// Build the content-free writing timeline: cumulative document length after each
+/// edit, paired with that edit's deltas (signals spec §7). The fingerprint graph
+/// plots `length` (y) against `at_ms` (x) — a paste appears as a vertical jump, a
+/// deletion as a dip. Stride-sampled to `MAX_TIMELINE_POINTS`, always keeping the
+/// last point so the final length is faithful.
+fn build_timeline(events: &[EditEvent]) -> Vec<TimelinePoint> {
+    let mut length: u64 = 0;
+    let full: Vec<TimelinePoint> = events
+        .iter()
+        .map(|e| {
+            length = (length + e.inserted_chars).saturating_sub(e.deleted_chars);
+            TimelinePoint {
+                at_ms: e.at_ms,
+                length,
+                inserted: e.inserted_chars,
+                deleted: e.deleted_chars,
+                keystrokes: e.keystrokes,
+            }
+        })
+        .collect();
+
+    if full.len() <= MAX_TIMELINE_POINTS {
+        return full;
+    }
+    let stride = full.len().div_ceil(MAX_TIMELINE_POINTS);
+    let mut sampled: Vec<TimelinePoint> = full.iter().step_by(stride).cloned().collect();
+    if let Some(last) = full.last() {
+        if sampled.last() != Some(last) {
+            sampled.push(last.clone());
+        }
+    }
+    sampled
 }
 
 /// Derive pause and burst statistics from inter-event timing.

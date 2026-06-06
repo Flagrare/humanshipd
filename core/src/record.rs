@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The current record schema identifier (spec §5).
-pub const SCHEMA: &str = "authorshipped/record@0.2";
+pub const SCHEMA: &str = "authorshipped/record@0.3";
 
 /// A metadata-only record of how a piece of text was written.
 ///
@@ -50,6 +50,23 @@ pub struct ProcessStats {
     /// Order-based, not offset-based: spans reflect insertion order, not final-text
     /// character ranges (exact offsets await positional capture).
     pub spans: Vec<ProvenanceSpan>,
+    /// Content-free timeline for the fingerprint graph (signals spec §7): document
+    /// length over time, with per-point edit deltas. Downsampled. Carries only
+    /// counts and timestamps — never text or positions within the text.
+    pub timeline: Vec<TimelinePoint>,
+}
+
+/// One sampled moment in the writing timeline (signals spec §7). Content-free.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimelinePoint {
+    /// Milliseconds since session start.
+    pub at_ms: u64,
+    /// Cumulative document length (chars) after this point's edit.
+    pub length: u64,
+    pub inserted: u64,
+    pub deleted: u64,
+    /// Physical keystrokes for this point (0 ⇒ text appeared without typing).
+    pub keystrokes: u64,
 }
 
 /// How a contiguous run of inserted text entered the document.

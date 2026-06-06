@@ -96,6 +96,32 @@ fn final_text_not_observed_entering_is_counted_unknown_and_marks_unverified() {
 }
 
 #[test]
+fn the_timeline_tracks_cumulative_length_and_marks_a_paste_as_a_jump() {
+    let text = "x".repeat(50);
+    let record = build_record(&session(
+        &text,
+        vec![typed(100, 20), pasted(200, 30)],
+    ));
+    let timeline = &record.process.timeline;
+    assert_eq!(timeline.len(), 2);
+    assert_eq!(timeline[0].length, 20);
+    assert_eq!(timeline[1].length, 50);
+    // the paste point arrived without keystrokes — the fingerprint's vertical jump.
+    assert_eq!(timeline[1].keystrokes, 0);
+    assert_eq!(timeline[1].inserted, 30);
+}
+
+#[test]
+fn a_deletion_dips_the_timeline_length() {
+    let text = "x".repeat(15);
+    let delete = EditEvent { at_ms: 200, inserted_chars: 0, deleted_chars: 5, keystrokes: 5 };
+    let record = build_record(&session(&text, vec![typed(100, 20), delete]));
+    let timeline = &record.process.timeline;
+    assert_eq!(timeline[0].length, 20);
+    assert_eq!(timeline[1].length, 15, "a deletion lowers cumulative length");
+}
+
+#[test]
 fn the_report_renders_from_a_verified_credential_record() {
     // The report is derived from the same record carried in the signed credential,
     // so a verifier reaches it after validation — no separate trust surface.

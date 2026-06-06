@@ -3,6 +3,7 @@
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
 use humanshipd_core::credential::read_sidecar;
+use humanshipd_core::record::TimelinePoint;
 use humanshipd_core::report::{render_report, ProvenanceReport};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
@@ -17,6 +18,8 @@ struct VerifyResult {
     /// Banded provenance report (signals spec §5); present only when the
     /// credential reads successfully.
     report: Option<ProvenanceReport>,
+    /// Content-free writing timeline for the fingerprint graph (signals spec §7).
+    timeline: Vec<TimelinePoint>,
     error: Option<String>,
 }
 
@@ -31,6 +34,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             char_count: readout.record.document_binding.char_count,
             ai_dump_flags: readout.record.evidence_flags.large_unkeyed_insertions,
             report: Some(render_report(&readout.record)),
+            timeline: readout.record.process.timeline.clone(),
             error: None,
         },
         Err(e) => VerifyResult {
@@ -40,6 +44,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             char_count: 0,
             ai_dump_flags: 0,
             report: None,
+            timeline: Vec::new(),
             error: Some(e.to_string()),
         },
     };

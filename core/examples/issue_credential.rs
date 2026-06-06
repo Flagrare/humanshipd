@@ -24,11 +24,33 @@ fn main() {
     let typed_b = "That shift is already visible in grid-scale procurement decisions.";
     let document = format!("{typed_a}{pasted}{typed_b}");
 
-    let events = vec![
-        EditEvent { at_ms: 500, inserted_chars: typed_a.chars().count() as u64, deleted_chars: 0, keystrokes: typed_a.chars().count() as u64 },
-        EditEvent { at_ms: 4000, inserted_chars: pasted.chars().count() as u64, deleted_chars: 0, keystrokes: 0 },
-        EditEvent { at_ms: 6000, inserted_chars: typed_b.chars().count() as u64, deleted_chars: 0, keystrokes: typed_b.chars().count() as u64 },
-    ];
+    // Incremental typing (≈5-char bursts) → one paste → more typing, with a small
+    // deletion, so the timeline has enough points to show a real shape.
+    let mut events = Vec::new();
+    let mut at = 0u64;
+    let typed_bursts = |events: &mut Vec<EditEvent>, at: &mut u64, text: &str| {
+        let chars: Vec<char> = text.chars().collect();
+        for chunk in chars.chunks(5) {
+            *at += 350;
+            events.push(EditEvent {
+                at_ms: *at,
+                inserted_chars: chunk.len() as u64,
+                deleted_chars: 0,
+                keystrokes: chunk.len() as u64,
+            });
+        }
+    };
+
+    typed_bursts(&mut events, &mut at, typed_a);
+    at += 1500;
+    events.push(EditEvent {
+        at_ms: at,
+        inserted_chars: pasted.chars().count() as u64,
+        deleted_chars: 0,
+        keystrokes: 0,
+    });
+    at += 800;
+    typed_bursts(&mut events, &mut at, typed_b);
 
     let record = build_record(&SessionInput {
         session_id: "demo-mixed-0001".into(),

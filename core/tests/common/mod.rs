@@ -37,6 +37,10 @@ pub fn sample_record() -> WritingSessionRecord {
                 chars: 1234,
                 keystrokes: 1200,
             }],
+            timeline: vec![
+                TimelinePoint { at_ms: 300, length: 600, inserted: 600, deleted: 0, keystrokes: 600 },
+                TimelinePoint { at_ms: 60_000, length: 1234, inserted: 634, deleted: 0, keystrokes: 600 },
+            ],
         },
         evidence_flags: EvidenceFlags {
             large_unkeyed_insertions: 0,

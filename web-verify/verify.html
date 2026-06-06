@@ -26,6 +26,14 @@
       .bar.ai_tool { background: #b3261e; }
       .bar.unknown { background: #9aa0a6; }
       .report .note { font-size: 12px; color: #666; margin-top: 8px; }
+      .fingerprint { margin-top: 20px; }
+      .fingerprint h2 { font-size: 14px; margin: 0 0 6px; }
+      .fingerprint svg { width: 100%; height: auto; border: 1px solid #e0e0e0; border-radius: 6px; background: #fafafa; }
+      .legend { font-size: 12px; color: #555; margin-top: 6px; display: flex; gap: 16px; }
+      .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+      .legend .typed::before { background: #137333; }
+      .legend .pasted::before { background: #e8a33d; }
+      .fingerprint .note { font-size: 12px; color: #666; margin-top: 6px; }
     </style>
   </head>
   <body>
@@ -48,6 +56,7 @@
       <div class="claim" id="claim"></div>
       <dl id="details"></dl>
       <div class="report" id="report"></div>
+      <div class="fingerprint" id="fingerprint"></div>
     </div>
 
     <script type="module">
@@ -96,8 +105,10 @@
         // dropped credential, which could be hostile — treat them as untrusted data.
         const details = document.getElementById("details");
         const report = document.getElementById("report");
+        const fingerprint = document.getElementById("fingerprint");
         details.replaceChildren();
         report.replaceChildren();
+        fingerprint.replaceChildren();
         if (out.error) return;
         const rows = [
           ["Document SHA-256", out.document_sha256],
@@ -112,10 +123,84 @@
           details.append(dt, dd);
         }
 
-        // Only show the provenance report when the credential is valid for THIS
-        // document — otherwise the bands describe the credential's own session,
-        // not the document on screen, which would mislead.
-        if (out.valid) renderReport(report, out.report);
+        // Only show the report + fingerprint when the credential is valid for THIS
+        // document — otherwise they describe the credential's own session, not the
+        // document on screen, which would mislead.
+        if (out.valid) {
+          renderReport(report, out.report);
+          renderFingerprint(fingerprint, out.timeline);
+        }
+      }
+
+      // Draftback-style writing fingerprint (signals spec §7): document length (y)
+      // over time (x). A paste appears as a vertical jump, a deletion as a dip.
+      // Content-free — built only from counts and timestamps, never text. SVG nodes
+      // are created via the SVG namespace with numeric attributes only.
+      const SVG_NS = "http://www.w3.org/2000/svg";
+      function renderFingerprint(container, timeline) {
+        if (!timeline || timeline.length === 0) return;
+
+        const heading = document.createElement("h2");
+        heading.textContent = "How the document was built over time";
+        container.append(heading);
+
+        const W = 600, H = 180, pad = 28;
+        const maxTime = Math.max(1, ...timeline.map((p) => p.at_ms));
+        const maxLen = Math.max(1, ...timeline.map((p) => p.length));
+        const x = (t) => pad + (t / maxTime) * (W - 2 * pad);
+        const y = (len) => H - pad - (len / maxLen) * (H - 2 * pad);
+
+        const svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", "Document length over time");
+
+        // baseline + y-axis
+        for (const [x1, y1, x2, y2] of [[pad, H - pad, W - pad, H - pad], [pad, pad, pad, H - pad]]) {
+          const axis = document.createElementNS(SVG_NS, "line");
+          axis.setAttribute("x1", x1); axis.setAttribute("y1", y1);
+          axis.setAttribute("x2", x2); axis.setAttribute("y2", y2);
+          axis.setAttribute("stroke", "#ccc"); axis.setAttribute("stroke-width", "1");
+          svg.append(axis);
+        }
+
+        // growth line through all points
+        const pts = timeline.map((p) => `${x(p.at_ms)},${y(p.length)}`).join(" ");
+        const line = document.createElementNS(SVG_NS, "polyline");
+        line.setAttribute("points", pts);
+        line.setAttribute("fill", "none");
+        line.setAttribute("stroke", "#9aa0a6");
+        line.setAttribute("stroke-width", "1.5");
+        svg.append(line);
+
+        // a dot per point — green typed, amber pasted; pastes drawn larger
+        for (const p of timeline) {
+          const pasted = p.inserted > 0 && p.keystrokes === 0;
+          const dot = document.createElementNS(SVG_NS, "circle");
+          dot.setAttribute("cx", x(p.at_ms));
+          dot.setAttribute("cy", y(p.length));
+          dot.setAttribute("r", pasted ? 5 : 2.5);
+          dot.setAttribute("fill", pasted ? "#e8a33d" : "#137333");
+          svg.append(dot);
+        }
+
+        container.append(svg);
+
+        const legend = document.createElement("div");
+        legend.className = "legend";
+        for (const [cls, label] of [["typed", "Typed"], ["pasted", "Pasted (a jump)"]]) {
+          const item = document.createElement("span");
+          item.className = cls;
+          item.textContent = label;
+          legend.append(item);
+        }
+        container.append(legend);
+
+        const note = document.createElement("div");
+        note.className = "note";
+        note.textContent =
+          "Length of the document as it was written. Vertical jumps are pastes; dips are deletions. Built from timing and counts only — no text.";
+        container.append(note);
       }
 
       // Banded provenance report (signals spec §5): proportions of how text
