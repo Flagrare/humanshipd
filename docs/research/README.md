@@ -6,6 +6,9 @@ External research conducted for this project. Each entry credits the sources it 
 
 | Date | Topic | Triggered by | Informed |
 |------|-------|--------------|----------|
+| 2026-06-06 | [Binding a Credential to a Formatted Document & Content Identity Across Formats](./2026-06-06-document-binding-and-content-identity.md) | Pre-refactor "retain file formats" / verify-against-what decision | v1 architecture brainstrm; binding/artifact model |
+| 2026-06-06 | [World-Class Architecture Practices for the v1 Refactor](./2026-06-06-software-architecture-practices.md) | Ground the v1 refactor in ports-&-adapters, shared-core, schema discipline | v1 architecture brainstorm; crate boundaries |
+| 2026-06-06 | [Edit-Stream Models & Capture Pipeline (OT/CRDT/event-sourcing)](./2026-06-06-edit-stream-models-capture-pipeline.md) | Ground humanshipd's EditEvent/op model in battle-tested edit-stream models | `EditEvent` op model upstream of `ProcessStats`; capture-fidelity spec |
 | 2026-06-06 | [Capturing the Google Docs Writing Process in the Browser](./2026-06-06-google-docs-writing-capture.md) | Make Google Docs the "smoking gun" browser-capture target | Capture-fidelity spec §4; Docs adapter spike |
 | 2026-06-06 | [Competitive Landscape of Authorship / Provenance / Detection Tools](./2026-06-06-competitive-landscape-authorship-tools.md) | "Research what other tools do; integrate the best parts" | Signals/reporting spec §8/§9/§10 |
 | 2026-06-06 | [AI-vs-Human Authorship Signals and Honest Probability Bands](./2026-06-06-ai-authorship-signals-and-probability-bands.md) | Grammarly-style banded report; "what signals estimate AI probability" | Signal taxonomy; provenance-vs-inference; spec §4/§5 |
