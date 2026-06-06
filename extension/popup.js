@@ -37,10 +37,22 @@ button.addEventListener("click", async () => {
     return;
   }
 
+  // Save the credential AND the exact document text it is bound to, so verifying
+  // is just dropping both files in — no fragile copy-paste to reproduce the bytes.
+  const docUrl =
+    "data:text/plain;charset=utf-8," + encodeURIComponent(session.final_text);
+  await chrome.downloads.download({
+    url: docUrl,
+    filename: "humanshipd-document.txt",
+    saveAs: false,
+  });
   await chrome.downloads.download({
     url: `data:application/octet-stream;base64,${result.manifest_b64}`,
     filename: "humanshipd-credential.c2pa",
-    saveAs: true,
+    saveAs: false,
   });
-  show("Credential issued and downloaded.", "ok");
+  show(
+    "Saved to your Downloads: humanshipd-credential.c2pa + humanshipd-document.txt. Drop BOTH into the verify page.",
+    "ok"
+  );
 });

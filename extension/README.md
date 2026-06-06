@@ -7,8 +7,11 @@ the local host. The captured text is sent only to that local host (to compute a
 hash); nothing is transmitted off your machine.
 
 It targets ordinary web editors (a `<textarea>`, an `<input>`, or any
-`contenteditable` element). Google Docs renders to a `<canvas>`, so its text
-isn't readable from a content script — a Docs-specific capture path is future work.
+`contenteditable` element) — text typed **into a web page**. It cannot see native
+apps like TextEdit or Word; for those, use the macOS capture tool, which records
+the same way and writes the matching document file alongside the credential.
+Google Docs renders to a `<canvas>`, so its text isn't readable from a content
+script either — a Docs-specific capture path is future work.
 
 ## Try it
 
@@ -18,12 +21,13 @@ isn't readable from a content script — a Docs-specific capture path is future 
    extension's ID that appears.
 3. **Register the host** with that ID:
    `bash extension/host/install.sh <EXTENSION_ID>` then fully quit and reopen Chrome.
-4. **Use it:** open any page with a text box (or `data:text/html,<textarea
-   style=width:90%;height:300px>`), type a few sentences, then click the
-   extension icon → *Issue Human Authored credential*. A `humanshipd-credential.c2pa`
-   downloads.
-5. **Verify it** against the text you wrote (save that text to `doc.txt`):
-   `cargo run --example verify_credential -- humanshipd-credential.c2pa doc.txt`
+4. **Use it:** open any page with a text box, type a few sentences, then click the
+   extension icon → *Issue Human Authored credential*. Two files land in your
+   Downloads: `humanshipd-credential.c2pa` and `humanshipd-document.txt` (the exact
+   text the credential is bound to — so there's nothing to reconstruct by hand).
+5. **Verify it** by dropping both files into the verify page
+   (<https://flagrare.github.io/humanshipd/>), or from the CLI:
+   `cargo run --example verify_credential -- humanshipd-credential.c2pa humanshipd-document.txt`
 
 Paste a chunk of text mid-session to see the AI-paste signal: the credential's
 `ai_dump_flags` count rises and the claim flips to the warning.
