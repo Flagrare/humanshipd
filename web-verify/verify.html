@@ -65,11 +65,24 @@
           ? "✓ Verified"
           : "✗ Not valid";
         document.getElementById("claim").textContent = out.claim || "";
-        document.getElementById("details").innerHTML = out.error
-          ? ""
-          : `<dt>Document SHA-256</dt><dd>${out.document_sha256}</dd>
-             <dt>Characters</dt><dd>${out.char_count}</dd>
-             <dt>Un-keyed (paste) insertions flagged</dt><dd>${out.ai_dump_flags}</dd>`;
+
+        // Build details with textContent (never innerHTML): the values come from a
+        // dropped credential, which could be hostile — treat them as untrusted data.
+        const details = document.getElementById("details");
+        details.replaceChildren();
+        if (out.error) return;
+        const rows = [
+          ["Document SHA-256", out.document_sha256],
+          ["Characters", String(out.char_count)],
+          ["Un-keyed (paste) insertions flagged", String(out.ai_dump_flags)],
+        ];
+        for (const [label, value] of rows) {
+          const dt = document.createElement("dt");
+          dt.textContent = label;
+          const dd = document.createElement("dd");
+          dd.textContent = value;
+          details.append(dt, dd);
+        }
       }
 
       button.addEventListener("click", async () => {
