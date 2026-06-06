@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px/1.5 -apple-system, system-ui, sans-serif; width: 280px; margin: 0; padding: 14px; }
+      h1 { font-size: 14px; margin: 0 0 6px; }
+      p.note { color: #555; margin: 0 0 12px; }
+      button { width: 100%; padding: 8px; font-size: 13px; cursor: pointer; }
+      #status { margin-top: 10px; white-space: pre-wrap; word-break: break-word; }
+      .ok { color: #137333; }
+      .err { color: #b3261e; }
+    </style>
+  </head>
+  <body>
+    <h1>Human Authored</h1>
+    <p class="note">Captured locally. Only a hash leaves your machine.</p>
+    <button id="issue">Issue Human Authored credential</button>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
