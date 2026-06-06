@@ -17,8 +17,27 @@
     if (!el) return null;
     const tag = el.tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return el.value;
-    if (el.isContentEditable) return el.innerText;
+    if (el.isContentEditable) {
+      // The input event can target a node deep inside a rich editor (tiptap,
+      // ProseMirror, Quill…); read the whole editable host, not just that node.
+      const host = el.closest('[contenteditable=""], [contenteditable="true"]');
+      if (host) return host.innerText;
+      // Old-style editors make a whole (often about:blank) iframe editable.
+      const doc = el.ownerDocument;
+      if (doc && doc.designMode === "on") return doc.body.innerText;
+      return el.innerText;
+    }
     return null;
+  }
+
+  // Code editors (Ace, CodeMirror, Monaco) type into a hidden proxy textarea and
+  // keep the real document in their own model + virtualized DOM — so we can't read
+  // their text from the page. Detect them so the popup can refuse honestly rather
+  // than issue a credential bound to an empty or partial buffer.
+  function codeEditorPresent() {
+    return !!document.querySelector(
+      ".ace_editor, .cm-editor, .CodeMirror, .monaco-editor"
+    );
   }
 
   // The caret/edit offset when we can read it: for input/textarea, the start of
@@ -78,16 +97,22 @@
   );
 
   // The popup asks for the current session; hand back the metadata + final text.
+  // The content script runs in EVERY frame (manifest `all_frames`), and a tab
+  // message reaches all of them — so a frame that captured nothing (e.g. the page
+  // shell around an editor iframe) must stay silent, or its empty answer can win
+  // the race and produce an empty document. Only the frame that actually recorded
+  // writing responds.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message?.type === "getSession") {
-      sendResponse({
-        session_id: `web-${Date.now()}`,
-        surface_kind: "web",
-        surface_app: location.hostname || "web",
-        final_text: lastText,
-        events,
-      });
-    }
+    if (message?.type !== "getSession") return false;
+    if (events.length === 0) return false; // nothing captured here — let another frame answer
+    sendResponse({
+      session_id: `web-${Date.now()}`,
+      surface_kind: "web",
+      surface_app: location.hostname || "web",
+      final_text: lastText,
+      events,
+      code_editor: codeEditorPresent(),
+    });
     return true;
   });
 })();

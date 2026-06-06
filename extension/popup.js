@@ -28,6 +28,20 @@ button.addEventListener("click", async () => {
     show("No writing captured yet — type in a text field, then try again.", "err");
     return;
   }
+  if (session.code_editor) {
+    show(
+      "This looks like a code editor (Ace / CodeMirror / Monaco). humanshipd can't read its text yet — its content isn't in the page. Try a plain text box, or the macOS app for desktop editors.",
+      "err"
+    );
+    return;
+  }
+  if (!session.final_text || !session.final_text.trim()) {
+    show(
+      "Couldn't read any text from this editor — it may be canvas- or model-based (like Google Docs). Try a plain text box, or the macOS app.",
+      "err"
+    );
+    return;
+  }
 
   show("Issuing credential via local host…");
   const author = document.getElementById("author").value.trim();

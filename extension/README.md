@@ -6,12 +6,21 @@ It holds no credential logic — capture happens in the page, signing happens in
 the local host. The captured text is sent only to that local host (to compute a
 hash); nothing is transmitted off your machine.
 
-It targets ordinary web editors (a `<textarea>`, an `<input>`, or any
-`contenteditable` element) — text typed **into a web page**. It cannot see native
-apps like TextEdit or Word; for those, use the macOS capture tool, which records
-the same way and writes the matching document file alongside the credential.
-Google Docs renders to a `<canvas>`, so its text isn't readable from a content
-script either — a Docs-specific capture path is future work.
+It captures text typed **into a web page**, but not every web editor exposes its
+text the same way:
+
+- **Works:** real `<textarea>` / `<input>` fields, and rich `contenteditable`
+  editors (tiptap, ProseMirror, Quill…), including ones inside `about:blank` /
+  `designMode` iframes.
+- **Refused, on purpose:** *code* editors (Ace, CodeMirror, Monaco) type into a
+  hidden proxy textarea and keep the document in their own model + virtualized DOM,
+  so a content script can't read it; *canvas* editors (Google Docs) render text to
+  a `<canvas>`. In both cases the popup now declines with a clear message instead
+  of issuing a credential bound to empty or partial text. Reading these would need
+  an editor-specific adapter injected into the page's main world (future work).
+- **Out of reach here:** native desktop apps (Word, TextEdit) — use the macOS
+  capture tool, which records the same way and writes the matching document file
+  alongside the credential.
 
 ## Try it
 
