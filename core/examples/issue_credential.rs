@@ -8,7 +8,7 @@
 //! Usage: `cargo run --example issue_credential -- <out-dir>`
 //! Writes `<out-dir>/credential.c2pa` and `<out-dir>/document.txt`.
 
-use humanshipd_core::credential::issue_sidecar;
+use humanshipd_core::credential::issue_sidecar_with_author;
 use humanshipd_core::session::{build_record, EditEvent, SessionInput};
 use std::{env, fs, process};
 
@@ -105,10 +105,12 @@ fn main() {
         events: ed.events,
     });
 
-    let manifest = issue_sidecar(&record, document.as_bytes()).unwrap_or_else(|e| {
-        eprintln!("issue error: {e}");
-        process::exit(1);
-    });
+    // A self-asserted author name (tamper-evident in the manifest, but unverified).
+    let manifest = issue_sidecar_with_author(&record, document.as_bytes(), Some("Ada Lovelace"))
+        .unwrap_or_else(|e| {
+            eprintln!("issue error: {e}");
+            process::exit(1);
+        });
 
     fs::create_dir_all(&out_dir).unwrap_or_else(|e| {
         eprintln!("cannot create {out_dir}: {e}");

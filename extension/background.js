@@ -14,6 +14,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     surface_app: message.session.surface_app,
     final_text: message.session.final_text,
     events: message.session.events,
+    author: message.author || null,
   };
 
   chrome.runtime.sendNativeMessage(HOST, request, (response) => {

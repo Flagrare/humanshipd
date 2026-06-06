@@ -30,7 +30,8 @@ button.addEventListener("click", async () => {
   }
 
   show("Issuing credential via local host…");
-  const result = await chrome.runtime.sendMessage({ type: "issue", session });
+  const author = document.getElementById("author").value.trim();
+  const result = await chrome.runtime.sendMessage({ type: "issue", session, author });
   if (!result?.ok) {
     show(`Host error: ${result?.error || "unknown"}`, "err");
     return;

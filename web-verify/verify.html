@@ -14,6 +14,9 @@
       #result.invalid { background: #fce8e6; border: 1px solid #b3261e; }
       .verdict { font-weight: 700; font-size: 16px; }
       .claim { margin-top: 8px; }
+      .author { margin-top: 10px; font-size: 14px; }
+      .author .name { font-weight: 600; }
+      .author .unverified { color: #777; font-size: 12px; }
       dl { margin-top: 10px; font-size: 13px; color: #444; }
       dt { font-weight: 600; } dd { margin: 0 0 6px; word-break: break-all; }
       .report { margin-top: 18px; }
@@ -64,6 +67,7 @@
     <div id="result">
       <div class="verdict" id="verdict"></div>
       <div class="claim" id="claim"></div>
+      <div class="author" id="author" style="display: none"></div>
       <dl id="details"></dl>
       <div class="report" id="report"></div>
       <div class="fingerprint" id="fingerprint"></div>
@@ -118,12 +122,29 @@
         const report = document.getElementById("report");
         const fingerprint = document.getElementById("fingerprint");
         const shape = document.getElementById("shape");
+        const author = document.getElementById("author");
         details.replaceChildren();
         report.replaceChildren();
         fingerprint.replaceChildren();
         shape.replaceChildren();
+        author.replaceChildren();
         shape.style.display = "none";
+        author.style.display = "none";
         if (out.error) return;
+
+        // Self-asserted author — shown only when valid, always labeled unverified.
+        if (out.valid && out.author) {
+          author.style.display = "block";
+          const label = document.createElement("span");
+          label.textContent = "Author: ";
+          const name = document.createElement("span");
+          name.className = "name";
+          name.textContent = out.author;
+          const note = document.createElement("span");
+          note.className = "unverified";
+          note.textContent = " — self-asserted, not independently verified";
+          author.append(label, name, note);
+        }
         const rows = [
           ["Document SHA-256", out.document_sha256],
           ["Characters", String(out.char_count)],

@@ -21,6 +21,9 @@ pub struct IssueRequest {
     /// Used only to compute the document hash + char count; never stored in the badge.
     pub final_text: String,
     pub events: Vec<EventDto>,
+    /// Optional self-asserted author name (unverified). Absent ⇒ no author.
+    #[serde(default)]
+    pub author: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

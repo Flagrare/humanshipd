@@ -22,6 +22,8 @@ struct VerifyResult {
     timeline: Vec<TimelinePoint>,
     /// Weak, positive-only process-shape corroboration (signals spec §3 Tier 2 / §6).
     process_shape: Option<ProcessShape>,
+    /// Self-asserted (unverified) author name, if the credential carries one.
+    author: Option<String>,
     error: Option<String>,
 }
 
@@ -38,6 +40,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             report: Some(render_report(&readout.record)),
             timeline: readout.record.process.timeline.clone(),
             process_shape: Some(render_process_shape(&readout.record)),
+            author: readout.author.clone(),
             error: None,
         },
         Err(e) => VerifyResult {
@@ -49,6 +52,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             report: None,
             timeline: Vec::new(),
             process_shape: None,
+            author: None,
             error: Some(e.to_string()),
         },
     };

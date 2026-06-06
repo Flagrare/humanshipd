@@ -7,6 +7,9 @@
       h1 { font-size: 14px; margin: 0 0 6px; }
       p.note { color: #555; margin: 0 0 12px; }
       button { width: 100%; padding: 8px; font-size: 13px; cursor: pointer; }
+      label { display: block; margin: 0 0 4px; color: #555; }
+      input[type="text"] { width: 100%; box-sizing: border-box; padding: 6px; font-size: 13px; margin-bottom: 10px; }
+      .hint { color: #777; font-size: 11px; margin: -8px 0 12px; }
       #status { margin-top: 10px; white-space: pre-wrap; word-break: break-word; }
       .ok { color: #137333; }
       .err { color: #b3261e; }
@@ -15,6 +18,9 @@
   <body>
     <h1>Human Authored</h1>
     <p class="note">Captured locally. Only a hash leaves your machine.</p>
+    <label for="author">Author name (optional)</label>
+    <input id="author" type="text" placeholder="e.g. Ada Lovelace" autocomplete="name" />
+    <p class="hint">Self-asserted — embedded in the credential but not independently verified.</p>
     <button id="issue">Issue Human Authored credential</button>
     <div id="status"></div>
     <script src="popup.js"></script>

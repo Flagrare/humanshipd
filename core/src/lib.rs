@@ -15,7 +15,8 @@ pub mod session;
 pub mod text_embed;
 
 pub use credential::{
-    issue_ephemeral, issue_sidecar, read, read_sidecar, CredentialReadout, PROCESS_ASSERTION,
+    issue_ephemeral, issue_sidecar, issue_sidecar_with_author, read, read_sidecar,
+    CredentialReadout, PROCESS_ASSERTION,
 };
 pub use error::CoreError;
 pub use record::{

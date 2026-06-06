@@ -204,10 +204,9 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 - ✅ `render_process_shape()` derives three content-free signals — planning pauses, revision activity, burst segmentation — from existing record stats. The assessment is only ever `IncrementalComposition` (weak positive corroboration) or `Inconclusive`; there is **no "looks like AI" verdict**, by design. Surfaced on the verify page as a muted, secondary panel with a loud caveat (weak, spoofable, 18–48% error; absence ≠ AI).
 - *Resolved open question:* Phase 3 is worth shipping **only** in this positive-corroboration-only form — it can affirm a human-like process but must never imply AI from its absence.
 
-**Phase 4 — Identity & sharing polish.**
-- CAWG Identity Assertion v1.2 (named-author identity).
-- Per-contributor attribution; shareable signed report view + downloadable PDF (trust-by-crypto); citation helper for `pasted` spans with known sources.
-- Opt-in, locally-held encrypted text log for glyph-level local replay (§7.4).
+**Phase 4 — Identity & sharing polish. ◧ in progress.**
+- ✅ **Self-asserted author name** — a signed (tamper-evident) but *unverified* `org.humanshipd.author` assertion, captured via the extension popup / host / example and shown on the verify page labeled "self-asserted, not independently verified". `CreativeWork` was rejected (deprecated in c2pa); a small custom assertion is honest for a name we cannot verify.
+- *Remaining:* **CAWG Identity Assertion v1.2** for *verified* author identity (needs a real identity signer — X.509 cert or claim aggregator; genuinely separate from the self-asserted name above). Per-contributor attribution; shareable signed report view + downloadable PDF (trust-by-crypto); citation helper for `pasted` spans with known sources; opt-in, locally-held encrypted text log for glyph-level local replay (§7.4).
 
 **Research track (unscheduled).** Zero-knowledge process attestation (prove "process features fall in human range" without revealing timing) — the ZK-PoP direction, as a privacy upgrade.
 

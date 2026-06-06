@@ -1,6 +1,7 @@
 use crate::messages::{EventDto, IssueRequest, Request, Response};
 use base64::Engine;
-use humanshipd_core::{build_record, credential, EditEvent, SessionInput};
+use humanshipd_core::credential::issue_sidecar_with_author;
+use humanshipd_core::{build_record, EditEvent, SessionInput};
 
 /// Dispatch a request to a response. Never panics; errors become `Response::Error`.
 pub fn process(request: Request) -> Response {
@@ -17,6 +18,7 @@ pub fn process(request: Request) -> Response {
 
 fn issue(req: IssueRequest) -> Response {
     let final_text = req.final_text.clone();
+    let author = req.author.clone();
     let input = SessionInput {
         session_id: req.session_id,
         surface_kind: req.surface_kind,
@@ -26,7 +28,7 @@ fn issue(req: IssueRequest) -> Response {
     };
 
     let record = build_record(&input);
-    match credential::issue_sidecar(&record, final_text.as_bytes()) {
+    match issue_sidecar_with_author(&record, final_text.as_bytes(), author.as_deref()) {
         Ok(manifest) => Response::Credential {
             manifest_b64: base64::engine::general_purpose::STANDARD.encode(manifest),
         },

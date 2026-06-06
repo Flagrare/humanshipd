@@ -1,5 +1,5 @@
 use humanshipd_core::canonical::sha256_hex;
-use humanshipd_core::credential::{issue_sidecar, read_sidecar};
+use humanshipd_core::credential::{issue_sidecar, issue_sidecar_with_author, read_sidecar};
 use humanshipd_core::session::{build_record, EditEvent, SessionInput, LARGE_UNKEYED_THRESHOLD};
 
 /// Simulate incremental typing: ~5 chars per event, each driven by keystrokes.
@@ -69,6 +69,30 @@ fn ai_dump_is_flagged_but_incremental_typing_is_not() {
             .large_unkeyed_insertions,
         0
     );
+}
+
+#[test]
+fn a_self_asserted_author_round_trips_and_is_absent_by_default() {
+    let text = "An essay written by a named human author.";
+    let record = build_record(&typed_session(text));
+
+    // Default issuance carries no author.
+    let plain = read_sidecar(&issue_sidecar(&record, text.as_bytes()).unwrap(), text.as_bytes()).unwrap();
+    assert_eq!(plain.author, None);
+
+    // With an author, the name round-trips through the signed credential.
+    let manifest = issue_sidecar_with_author(&record, text.as_bytes(), Some("Ada Lovelace")).unwrap();
+    let readout = read_sidecar(&manifest, text.as_bytes()).unwrap();
+    assert!(readout.valid);
+    assert_eq!(readout.author.as_deref(), Some("Ada Lovelace"));
+}
+
+#[test]
+fn a_blank_author_name_is_treated_as_no_author() {
+    let text = "Some writing without a real name attached.";
+    let record = build_record(&typed_session(text));
+    let manifest = issue_sidecar_with_author(&record, text.as_bytes(), Some("   ")).unwrap();
+    assert_eq!(read_sidecar(&manifest, text.as_bytes()).unwrap().author, None);
 }
 
 #[test]

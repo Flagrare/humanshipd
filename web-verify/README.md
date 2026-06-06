@@ -44,7 +44,9 @@ drafting rhythm (planning pauses, revisions, bursts) — it can affirm "consiste
 with incremental composition" but never says "looks like AI", and its absence is
 explicitly not evidence of AI. The bands describe *provenance*, not a guess about
 whether the text is AI-written, and the report, graph, and panel appear only when
-the credential is valid for the document.
+the credential is valid for the document. If the credential carries a
+**self-asserted author name**, it is shown labeled "not independently verified" —
+the name is signed (tamper-evident) but a local-only tool cannot attest identity.
 
 To generate a fixture for manual testing:
 

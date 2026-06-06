@@ -13,6 +13,7 @@ use crate::error::CoreError;
 use crate::record::WritingSessionRecord;
 use c2pa::assertions::DataHash;
 use c2pa::{Builder, Context, EphemeralSigner, Reader, Signer, ValidationState};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::io::Cursor;
 
@@ -22,9 +23,19 @@ const MANIFEST_STORE_FORMAT: &str = "application/c2pa";
 /// Reverse-DNS label for our process-metadata assertion.
 /// (No `.vN` suffix — c2pa interprets that as an assertion version and strips it.)
 pub const PROCESS_ASSERTION: &str = "org.humanshipd.process";
+/// Reverse-DNS label for the **self-asserted** (unverified) author name.
+/// (Verified identity is the future CAWG-identity-assertion path — not this.)
+pub const AUTHOR_ASSERTION: &str = "org.humanshipd.author";
 /// IPTC digitalSourceType for text composed by a human with non-generative tools
 /// — the de-facto "human, not AI-generated" baseline (signals spec §9).
 const DIGITAL_CREATION: &str = "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCreation";
+
+/// A self-asserted author name carried in the signed manifest (tamper-evident, but
+/// not independently verified — a local-only tool cannot attest identity).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct AuthorAssertion {
+    name: String,
+}
 
 fn c2pa_err(e: impl std::fmt::Display) -> CoreError {
     CoreError::Crypto(e.to_string())
@@ -81,6 +92,19 @@ pub fn issue_sidecar(
     record: &WritingSessionRecord,
     file_bytes: &[u8],
 ) -> Result<Vec<u8>, CoreError> {
+    issue_sidecar_with_author(record, file_bytes, None)
+}
+
+/// Like [`issue_sidecar`], but also embeds a **self-asserted** author name as a
+/// schema.org `CreativeWork` assertion (signals spec §9 / Phase 4). The name is
+/// signed (so it is tamper-evident) but **not** independently verified — a
+/// local-only tool cannot attest identity. Maps onto a CAWG identity assertion
+/// later if a real identity signer is ever supplied.
+pub fn issue_sidecar_with_author(
+    record: &WritingSessionRecord,
+    file_bytes: &[u8],
+    author: Option<&str>,
+) -> Result<Vec<u8>, CoreError> {
     let signer = EphemeralSigner::new("humanshipd.local").map_err(c2pa_err)?;
     let mut builder = Builder::from_context(Context::new())
         .with_definition(serde_json::json!({
@@ -91,6 +115,11 @@ pub fn issue_sidecar(
     builder
         .add_assertion(PROCESS_ASSERTION, record)
         .map_err(c2pa_err)?;
+    if let Some(name) = author.map(str::trim).filter(|n| !n.is_empty()) {
+        builder
+            .add_assertion(AUTHOR_ASSERTION, &AuthorAssertion { name: name.to_string() })
+            .map_err(c2pa_err)?;
+    }
     builder
         .add_action(serde_json::json!({
             "action": "c2pa.created",
@@ -145,7 +174,16 @@ pub fn read_sidecar(
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
     let hash_ok = record.document_binding.final_text_sha256 == sha256_hex(file_bytes);
-    Ok(readout(signature_ok && hash_ok, record))
+    let author = self_asserted_author(manifest_obj);
+    Ok(readout(signature_ok && hash_ok, record, author))
+}
+
+/// Extract the self-asserted author name, if the manifest carries one.
+fn self_asserted_author(manifest: &c2pa::Manifest) -> Option<String> {
+    manifest
+        .find_assertion::<AuthorAssertion>(AUTHOR_ASSERTION)
+        .ok()
+        .map(|a| a.name)
 }
 
 /// Verification outcome from reading a signed manifest.
@@ -155,14 +193,18 @@ pub struct CredentialReadout {
     pub record: WritingSessionRecord,
     /// Honest, non-overclaiming human-readable claim.
     pub claim: String,
+    /// Self-asserted author name, if the credential carries one. **Not**
+    /// independently verified — see [`issue_sidecar_with_author`].
+    pub author: Option<String>,
 }
 
-fn readout(valid: bool, record: WritingSessionRecord) -> CredentialReadout {
+fn readout(valid: bool, record: WritingSessionRecord, author: Option<String>) -> CredentialReadout {
     let claim = render_claim(valid, record.evidence_flags.large_unkeyed_insertions);
     CredentialReadout {
         valid,
         record,
         claim,
+        author,
     }
 }
 
@@ -203,5 +245,6 @@ pub fn read(asset_format: &str, signed_asset: &[u8]) -> Result<CredentialReadout
     let record = manifest
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
-    Ok(readout(valid, record))
+    let author = self_asserted_author(manifest);
+    Ok(readout(valid, record, author))
 }
