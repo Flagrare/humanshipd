@@ -6,6 +6,8 @@ External research conducted for this project. Each entry credits the sources it 
 
 | Date | Topic | Triggered by | Informed |
 |------|-------|--------------|----------|
+| 2026-06-06 | [Competitive Landscape of Authorship / Provenance / Detection Tools](./2026-06-06-competitive-landscape-authorship-tools.md) | "Research what other tools do; integrate the best parts" | Signals/reporting spec §8/§9/§10 |
+| 2026-06-06 | [AI-vs-Human Authorship Signals and Honest Probability Bands](./2026-06-06-ai-authorship-signals-and-probability-bands.md) | Grammarly-style banded report; "what signals estimate AI probability" | Signal taxonomy; provenance-vs-inference; spec §4/§5 |
 | 2026-06-05 | [Adopting C2PA + Standards for the Credential Stack](./2026-06-05-adopting-c2pa-credential-stack.md) | Directive to adopt standards, not reinvent | Refactor core to c2pa-rs; spec §6/§7/§9 |
 | 2026-06-05 | [App-Agnostic, On-Device Capture Architecture](./2026-06-05-app-agnostic-capture-architecture.md) | "Blend into any app" capture requirement (Cluely-class) | Capture-layer design; forthcoming spec |
 | 2026-06-05 | [Positive vs. Negative Framing of a Human-Authorship Label](./2026-06-05-human-authorship-label-framing.md) | Naming/badge framing decision (AI-Free vs Human Authored) | Naming recommendation; forthcoming design spec |

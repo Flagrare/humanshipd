@@ -2,6 +2,7 @@
 
 - **Date:** 2026-06-05
 - **Status:** draft (awaiting user review)
+- **Companion spec:** [`2026-06-06-authorship-signals-and-reporting-design.md`](./2026-06-06-authorship-signals-and-reporting-design.md) — the signal taxonomy (provenance vs. inference), per-span banded report, content-free replay/visualization, competitive landscape, and the borrowed-feature roadmap.
 - **Research basis:** [`docs/research/2026-06-05-proof-of-human-authorship-feasibility.md`](../../research/2026-06-05-proof-of-human-authorship-feasibility.md), [`…-app-agnostic-capture-architecture.md`](../../research/2026-06-05-app-agnostic-capture-architecture.md), [`…-human-authorship-label-framing.md`](../../research/2026-06-05-human-authorship-label-framing.md)
 
 ## 1. Summary
