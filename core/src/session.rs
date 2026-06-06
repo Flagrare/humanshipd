@@ -28,6 +28,10 @@ pub struct EditEvent {
     pub deleted_chars: u64,
     /// Physical keystrokes attributed to this event (0 ⇒ text appeared without typing).
     pub keystrokes: u64,
+    /// Character offset where the edit occurred, when the adapter can determine it
+    /// (caret position / text-diff locus). `None` ⇒ position unknown — the
+    /// fingerprint then falls back to cumulative length instead of true position.
+    pub at_offset: Option<u64>,
 }
 
 /// Build a metadata-only record from captured events. No document content is retained.
@@ -148,6 +152,7 @@ fn build_timeline(events: &[EditEvent]) -> Vec<TimelinePoint> {
             TimelinePoint {
                 at_ms: e.at_ms,
                 length,
+                offset: e.at_offset,
                 inserted: e.inserted_chars,
                 deleted: e.deleted_chars,
                 keystrokes: e.keystrokes,

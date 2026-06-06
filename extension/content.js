@@ -21,6 +21,18 @@
     return null;
   }
 
+  // The caret/edit offset when we can read it: for input/textarea, the start of
+  // the current selection (the insertion point). Contenteditable carets aren't a
+  // simple character index, so we return null there (position unknown — honest).
+  function editOffset(el) {
+    if (!el) return null;
+    const tag = el.tagName;
+    if ((tag === "TEXTAREA" || tag === "INPUT") && typeof el.selectionStart === "number") {
+      return el.selectionStart;
+    }
+    return null;
+  }
+
   function charLen(s) {
     return Array.from(s).length;
   }
@@ -46,12 +58,17 @@
       const deleted = Math.max(-delta, 0);
       // Typed insertions carry keystrokes; a paste arrives with none.
       const keystrokes = pastePending ? 0 : inserted;
+      // The caret sits at the end of the just-inserted text; the edit started
+      // `inserted` chars earlier.
+      const caret = editOffset(event.target);
+      const at_offset = caret === null ? null : Math.max(caret - inserted, 0);
 
       events.push({
         at_ms: Date.now() - startTime,
         inserted_chars: inserted,
         deleted_chars: deleted,
         keystrokes,
+        at_offset,
       });
 
       lastText = text;

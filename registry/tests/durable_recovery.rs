@@ -22,6 +22,7 @@ fn typed_session(text: &str) -> SessionInput {
             inserted_chars: chunk.len() as u64,
             deleted_chars: 0,
             keystrokes: chunk.len() as u64,
+            at_offset: None,
         });
     }
     SessionInput {

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The current record schema identifier (spec §5).
-pub const SCHEMA: &str = "authorshipped/record@0.3";
+pub const SCHEMA: &str = "authorshipped/record@0.4";
 
 /// A metadata-only record of how a piece of text was written.
 ///
@@ -63,6 +63,9 @@ pub struct TimelinePoint {
     pub at_ms: u64,
     /// Cumulative document length (chars) after this point's edit.
     pub length: u64,
+    /// Character offset where the edit occurred, when known (caret/diff locus).
+    /// `None` ⇒ position unknown; the fingerprint falls back to `length`.
+    pub offset: Option<u64>,
     pub inserted: u64,
     pub deleted: u64,
     /// Physical keystrokes for this point (0 ⇒ text appeared without typing).

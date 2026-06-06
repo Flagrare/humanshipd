@@ -58,6 +58,11 @@ impl Capturer {
             .map(|p| p.chars().count() as i64)
             .unwrap_or(0);
         let delta = new_len - prev_len;
+        // The edit locus = length of the common prefix between old and new text.
+        let at_offset = Some(common_prefix_chars(
+            self.prev_value.as_deref().unwrap_or(""),
+            &current,
+        ));
 
         let event = if delta > 0 {
             let inserted = delta as u64;
@@ -71,6 +76,7 @@ impl Capturer {
                 inserted_chars: inserted,
                 deleted_chars: 0,
                 keystrokes,
+                at_offset,
             }
         } else if delta < 0 {
             EditEvent {
@@ -78,6 +84,7 @@ impl Capturer {
                 inserted_chars: 0,
                 deleted_chars: (-delta) as u64,
                 keystrokes: 0,
+                at_offset,
             }
         } else {
             // Same length, different content: a reformulation; treat as one keyed edit.
@@ -86,6 +93,7 @@ impl Capturer {
                 inserted_chars: 0,
                 deleted_chars: 0,
                 keystrokes: 1,
+                at_offset,
             }
         };
 
@@ -108,4 +116,10 @@ impl Capturer {
             events: self.events,
         })
     }
+}
+
+/// Number of leading characters shared by `a` and `b` — the locus where they first
+/// diverge, i.e. where an edit happened.
+fn common_prefix_chars(a: &str, b: &str) -> u64 {
+    a.chars().zip(b.chars()).take_while(|(x, y)| x == y).count() as u64
 }

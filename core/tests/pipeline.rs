@@ -14,6 +14,7 @@ fn typed_session(text: &str) -> SessionInput {
             inserted_chars: chunk.len() as u64,
             deleted_chars: 0,
             keystrokes: chunk.len() as u64,
+            at_offset: None,
         });
     }
     SessionInput {
@@ -58,6 +59,7 @@ fn ai_dump_is_flagged_but_incremental_typing_is_not() {
             inserted_chars: text.chars().count() as u64,
             deleted_chars: 0,
             keystrokes: 0,
+            at_offset: None,
         }],
     };
     assert!(build_record(&dump).evidence_flags.large_unkeyed_insertions >= 1);

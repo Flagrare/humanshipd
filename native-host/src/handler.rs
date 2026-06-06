@@ -42,5 +42,6 @@ fn to_event(dto: EventDto) -> EditEvent {
         inserted_chars: dto.inserted_chars,
         deleted_chars: dto.deleted_chars,
         keystrokes: dto.keystrokes,
+        at_offset: dto.at_offset,
     }
 }

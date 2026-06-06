@@ -29,6 +29,9 @@ pub struct EventDto {
     pub inserted_chars: u64,
     pub deleted_chars: u64,
     pub keystrokes: u64,
+    /// Caret/edit offset when the adapter can determine it; absent ⇒ `None`.
+    #[serde(default)]
+    pub at_offset: Option<u64>,
 }
 
 /// Responses the host sends back to the extension.

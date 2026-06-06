@@ -1,8 +1,9 @@
 //! Headless credential issuer (the sibling of `verify_credential`).
 //!
-//! Builds a record from a synthetic mixed session (typing + one paste) so the
-//! resulting credential exercises the banded provenance report, then writes a
-//! `.c2pa` sidecar and its document next to each other.
+//! Simulates a realistic editing session against a text buffer — incremental
+//! typing, one paste, then a mid-document revisit — so the resulting credential
+//! exercises the banded report AND the position-aware fingerprint (the revisit
+//! shows as a dip back to an earlier offset). Writes a `.c2pa` sidecar + document.
 //!
 //! Usage: `cargo run --example issue_credential -- <out-dir>`
 //! Writes `<out-dir>/credential.c2pa` and `<out-dir>/document.txt`.
@@ -11,53 +12,76 @@ use humanshipd_core::credential::issue_sidecar;
 use humanshipd_core::session::{build_record, EditEvent, SessionInput};
 use std::{env, fs, process};
 
+/// A tiny editing simulator: applies inserts at character offsets to a buffer and
+/// records a real `EditEvent` (with `at_offset`) for each, so the document and the
+/// event stream are mutually consistent.
+struct Editor {
+    buf: Vec<char>,
+    at_ms: u64,
+    events: Vec<EditEvent>,
+}
+
+impl Editor {
+    fn new() -> Self {
+        Self { buf: Vec::new(), at_ms: 0, events: Vec::new() }
+    }
+
+    fn insert(&mut self, offset: usize, text: &str, keyed: bool, gap_ms: u64) {
+        self.at_ms += gap_ms;
+        let chars: Vec<char> = text.chars().collect();
+        let n = chars.len() as u64;
+        self.buf.splice(offset..offset, chars);
+        self.events.push(EditEvent {
+            at_ms: self.at_ms,
+            inserted_chars: n,
+            deleted_chars: 0,
+            keystrokes: if keyed { n } else { 0 },
+            at_offset: Some(offset as u64),
+        });
+    }
+
+    /// Type `text` at the end in ≈5-char bursts.
+    fn type_bursts(&mut self, text: &str) {
+        for chunk in text.chars().collect::<Vec<_>>().chunks(5) {
+            let chunk: String = chunk.iter().collect();
+            let end = self.buf.len();
+            self.insert(end, &chunk, true, 350);
+        }
+    }
+
+    fn document(&self) -> String {
+        self.buf.iter().collect()
+    }
+}
+
 fn main() {
     let out_dir = env::args().nth(1).unwrap_or_else(|| {
         eprintln!("usage: issue_credential <out-dir>");
         process::exit(2);
     });
 
-    // A mostly-typed document with one pasted block in the middle, so the report
-    // shows distinct Typed and Pasted bands.
-    let typed_a = "Renewable energy is reshaping how economies allocate capital. ";
-    let pasted = "Countries investing in renewable technologies stand to gain a competitive edge. ";
-    let typed_b = "That shift is already visible in grid-scale procurement decisions.";
-    let document = format!("{typed_a}{pasted}{typed_b}");
+    let mut ed = Editor::new();
+    ed.type_bursts("Renewable energy is reshaping how economies allocate capital. ");
+    // A pasted block appended without keystrokes (the AI-dump signal).
+    let paste_at = ed.buf.len();
+    ed.insert(
+        paste_at,
+        "Countries investing in renewable technologies stand to gain a competitive edge. ",
+        false,
+        1500,
+    );
+    ed.type_bursts("That shift is already visible in grid-scale procurement decisions.");
+    // A mid-document revisit: insert a word back near the start (offset 10) — this
+    // is the case a position-aware fingerprint reveals that a length-only one cannot.
+    ed.insert(10, "clean ", true, 1200);
 
-    // Incremental typing (≈5-char bursts) → one paste → more typing, with a small
-    // deletion, so the timeline has enough points to show a real shape.
-    let mut events = Vec::new();
-    let mut at = 0u64;
-    let typed_bursts = |events: &mut Vec<EditEvent>, at: &mut u64, text: &str| {
-        let chars: Vec<char> = text.chars().collect();
-        for chunk in chars.chunks(5) {
-            *at += 350;
-            events.push(EditEvent {
-                at_ms: *at,
-                inserted_chars: chunk.len() as u64,
-                deleted_chars: 0,
-                keystrokes: chunk.len() as u64,
-            });
-        }
-    };
-
-    typed_bursts(&mut events, &mut at, typed_a);
-    at += 1500;
-    events.push(EditEvent {
-        at_ms: at,
-        inserted_chars: pasted.chars().count() as u64,
-        deleted_chars: 0,
-        keystrokes: 0,
-    });
-    at += 800;
-    typed_bursts(&mut events, &mut at, typed_b);
-
+    let document = ed.document();
     let record = build_record(&SessionInput {
         session_id: "demo-mixed-0001".into(),
         surface_kind: "native-ax".into(),
         surface_app: "TextEdit".into(),
         final_text: document.clone(),
-        events,
+        events: ed.events,
     });
 
     let manifest = issue_sidecar(&record, document.as_bytes()).unwrap_or_else(|e| {

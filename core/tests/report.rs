@@ -14,11 +14,11 @@ fn session(final_text: &str, events: Vec<EditEvent>) -> SessionInput {
 }
 
 fn typed(at_ms: u64, chars: u64) -> EditEvent {
-    EditEvent { at_ms, inserted_chars: chars, deleted_chars: 0, keystrokes: chars }
+    EditEvent { at_ms, inserted_chars: chars, deleted_chars: 0, keystrokes: chars, at_offset: None }
 }
 
 fn pasted(at_ms: u64, chars: u64) -> EditEvent {
-    EditEvent { at_ms, inserted_chars: chars, deleted_chars: 0, keystrokes: 0 }
+    EditEvent { at_ms, inserted_chars: chars, deleted_chars: 0, keystrokes: 0, at_offset: None }
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn a_paste_between_typing_yields_three_ordered_spans() {
 #[test]
 fn pure_deletions_do_not_break_a_typed_run() {
     let text = "x".repeat(20);
-    let delete = EditEvent { at_ms: 200, inserted_chars: 0, deleted_chars: 5, keystrokes: 5 };
+    let delete = EditEvent { at_ms: 200, inserted_chars: 0, deleted_chars: 5, keystrokes: 5, at_offset: None };
     let record = build_record(&session(&text, vec![typed(100, 10), delete, typed(300, 10)]));
     assert_eq!(record.process.spans.len(), 1, "a delete is a revision, not a span boundary");
     assert_eq!(record.process.spans[0].chars, 20);
@@ -112,9 +112,21 @@ fn the_timeline_tracks_cumulative_length_and_marks_a_paste_as_a_jump() {
 }
 
 #[test]
+fn the_timeline_carries_per_edit_offset_when_the_adapter_supplies_it() {
+    let text = "x".repeat(30);
+    let mut e1 = typed(100, 20);
+    e1.at_offset = Some(0);
+    let mut e2 = typed(200, 10);
+    e2.at_offset = Some(5); // a revisit: edit back at offset 5
+    let record = build_record(&session(&text, vec![e1, e2]));
+    assert_eq!(record.process.timeline[0].offset, Some(0));
+    assert_eq!(record.process.timeline[1].offset, Some(5));
+}
+
+#[test]
 fn a_deletion_dips_the_timeline_length() {
     let text = "x".repeat(15);
-    let delete = EditEvent { at_ms: 200, inserted_chars: 0, deleted_chars: 5, keystrokes: 5 };
+    let delete = EditEvent { at_ms: 200, inserted_chars: 0, deleted_chars: 5, keystrokes: 5, at_offset: None };
     let record = build_record(&session(&text, vec![typed(100, 20), delete]));
     let timeline = &record.process.timeline;
     assert_eq!(timeline[0].length, 20);
