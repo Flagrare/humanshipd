@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The current record schema identifier (spec §5).
-pub const SCHEMA: &str = "authorshipped/record@0.1";
+pub const SCHEMA: &str = "authorshipped/record@0.2";
 
 /// A metadata-only record of how a piece of text was written.
 ///
@@ -46,6 +46,33 @@ pub struct ProcessStats {
     pub insertions_without_keystrokes: Vec<UnkeyedInsertion>,
     /// Fraction of inserted characters accompanied by keystrokes (typed vs appeared).
     pub keyed_fraction: f64,
+    /// Ordered provenance of how text entered the document (signals spec §4).
+    /// Order-based, not offset-based: spans reflect insertion order, not final-text
+    /// character ranges (exact offsets await positional capture).
+    pub spans: Vec<ProvenanceSpan>,
+}
+
+/// How a contiguous run of inserted text entered the document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Provenance {
+    /// Arrived via keystrokes in a tracked editor.
+    Typed,
+    /// Arrived via paste (origin captured separately, never the content).
+    Pasted,
+    /// Accepted from a recognized AI integration / pasted from a known AI tool.
+    AiTool,
+    /// Entered outside any tracked surface, or pre-dates capture.
+    Unknown,
+}
+
+/// One contiguous run of inserted text with a single provenance (signals spec §4).
+/// Carries counts only — never the text itself.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProvenanceSpan {
+    pub provenance: Provenance,
+    pub chars: u64,
+    pub keystrokes: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

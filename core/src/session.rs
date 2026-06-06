@@ -69,6 +69,7 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
     };
 
     let (pauses, bursts) = pauses_and_bursts(events);
+    let spans = build_spans(events);
 
     WritingSessionRecord {
         schema: SCHEMA.to_string(),
@@ -89,6 +90,7 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
             revisions,
             insertions_without_keystrokes,
             keyed_fraction,
+            spans,
         },
         evidence_flags: EvidenceFlags {
             large_unkeyed_insertions,
@@ -98,6 +100,34 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
             log_sha256: None,
         },
     }
+}
+
+/// Derive ordered provenance spans by merging consecutive insertions of the same
+/// class (typed vs. pasted). Pure-deletion events are skipped — they are revisions,
+/// captured in `RevisionStats`, and do not break a same-class run. Origin detail
+/// (AI tool, paste source) is not yet available from the event stream, so the
+/// builder emits only `Typed` and `Pasted`.
+fn build_spans(events: &[EditEvent]) -> Vec<ProvenanceSpan> {
+    let mut spans: Vec<ProvenanceSpan> = Vec::new();
+    for event in events.iter().filter(|e| e.inserted_chars > 0) {
+        let provenance = if event.keystrokes > 0 {
+            Provenance::Typed
+        } else {
+            Provenance::Pasted
+        };
+        match spans.last_mut() {
+            Some(span) if span.provenance == provenance => {
+                span.chars += event.inserted_chars;
+                span.keystrokes += event.keystrokes;
+            }
+            _ => spans.push(ProvenanceSpan {
+                provenance,
+                chars: event.inserted_chars,
+                keystrokes: event.keystrokes,
+            }),
+        }
+    }
+    spans
 }
 
 /// Derive pause and burst statistics from inter-event timing.

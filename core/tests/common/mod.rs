@@ -32,6 +32,11 @@ pub fn sample_record() -> WritingSessionRecord {
             },
             insertions_without_keystrokes: vec![],
             keyed_fraction: 1.0,
+            spans: vec![ProvenanceSpan {
+                provenance: Provenance::Typed,
+                chars: 1234,
+                keystrokes: 1200,
+            }],
         },
         evidence_flags: EvidenceFlags {
             large_unkeyed_insertions: 0,

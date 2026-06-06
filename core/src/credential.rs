@@ -22,7 +22,9 @@ const MANIFEST_STORE_FORMAT: &str = "application/c2pa";
 /// Reverse-DNS label for our process-metadata assertion.
 /// (No `.vN` suffix — c2pa interprets that as an assertion version and strips it.)
 pub const PROCESS_ASSERTION: &str = "org.humanshipd.process";
-const DIGITAL_CAPTURE: &str = "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture";
+/// IPTC digitalSourceType for text composed by a human with non-generative tools
+/// — the de-facto "human, not AI-generated" baseline (signals spec §9).
+const DIGITAL_CREATION: &str = "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCreation";
 
 fn c2pa_err(e: impl std::fmt::Display) -> CoreError {
     CoreError::Crypto(e.to_string())
@@ -59,7 +61,7 @@ fn issue_with_context(
     builder
         .add_action(serde_json::json!({
             "action": "c2pa.created",
-            "digitalSourceType": DIGITAL_CAPTURE
+            "digitalSourceType": DIGITAL_CREATION
         }))
         .map_err(c2pa_err)?;
 
@@ -92,7 +94,7 @@ pub fn issue_sidecar(
     builder
         .add_action(serde_json::json!({
             "action": "c2pa.created",
-            "digitalSourceType": DIGITAL_CAPTURE
+            "digitalSourceType": DIGITAL_CREATION
         }))
         .map_err(c2pa_err)?;
 

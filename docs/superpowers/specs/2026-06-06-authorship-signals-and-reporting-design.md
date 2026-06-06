@@ -88,6 +88,8 @@ Provenance classes (descriptive, never accusatory):
 
 Computing spans is **change-point detection** on the event stream (boundaries) followed by labeling (class). Because boundaries are observed events, only the label is probabilistic — and for Tier-1 signals it is effectively certain.
 
+**Shipped (Phase 1, record schema `@0.2`):** `ProcessStats.spans` is an ordered list of `{ provenance, chars, keystrokes }`, built by merging consecutive insertions of the same class. It is **order-based, not offset-based** — the schema above's `range`/`source`/`edited_after`/`bursts` fields await positional capture (offsets) and richer origin signals from the adapters. The builder currently emits only `typed` and `pasted`; `ai_tool` and `unknown` spans require adapter signals not yet present (final-document `unknown` is derived in the report — §5).
+
 ## 5. Banded provenance report (the "Writing activity report")
 
 The user-facing deliverable, modeled on Grammarly's report but corrected.
@@ -184,10 +186,11 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 
 **Phase 0 — Provenance backbone (largely built).** Tier-1 capture: keyed-fraction, large un-keyed insertions, timing. Single honest claim string. → *core today.*
 
-**Phase 1 — Per-span provenance + banded report.**
-- Extend `WritingSessionRecord.process` with `spans[]` (§4); change-point detection over the event stream.
-- `render_report()` → word-count proportion bands + four-tier nuance summary (§5).
-- Emit IPTC `digitalCreation` in the C2PA manifest (§9).
+**Phase 1 — Per-span provenance + banded report. ✅ shipped (core).**
+- ✅ `WritingSessionRecord.process.spans[]` (order-based; schema `@0.2`) built in `build_record` (§4).
+- ✅ `render_report()` → word-count proportion bands + four-tier nuance summary, with final-document `unknown` derived (§5).
+- ✅ Emit IPTC `digitalCreation` (corrected from `digitalCapture`) in the C2PA manifest (§9).
+- *Remaining:* surface the report in the verify page / popup UI; offset-based spans + `source`/`ai_tool` once adapters emit position and origin.
 
 **Phase 2 — Content-free visualization.**
 - Structural replay + Draftback-style position-vs-time fingerprint graph + paste timeline with jump-to-paste markers (§7.1–7.3).
