@@ -217,8 +217,12 @@ fn render_claim(valid: bool, large_unkeyed_insertions: u64) -> String {
         "Verified C2PA credential: signed and unaltered since issuance, bound to this exact document.".to_string(),
     ];
     if large_unkeyed_insertions > 0 {
+        let (n, noun) = (
+            large_unkeyed_insertions,
+            if large_unkeyed_insertions == 1 { "insertion" } else { "insertions" },
+        );
         parts.push(format!(
-            "WARNING: {large_unkeyed_insertions} large insertion(s) appeared without typing — possible paste of AI-generated text."
+            "WARNING: {n} large {noun} appeared without typing — possible paste of AI-generated text."
         ));
     } else {
         parts.push(

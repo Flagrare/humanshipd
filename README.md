@@ -30,6 +30,20 @@ Five steps turn an act of writing into a checkable certificate.
 
 **5. Anyone can verify it.** A reader checks the certificate against the document: the signature confirms nothing was altered, and the fingerprint confirms it's the right document. No sign-in, no server call, no data collected.
 
+## Try it
+
+Nothing is packaged for download yet, but the whole loop runs from the repo. To see it end-to-end without typing a word, generate a demo credential and open the in-browser verifier (you'll need Rust and [`wasm-pack`](https://rustwasm.github.io/wasm-pack/)):
+
+```bash
+# 1. generate a demo credential and the document it's bound to
+cargo run --example issue_credential -- /tmp/demo
+
+# 2. build the in-browser verifier and serve it
+cd web-verify && wasm-pack build --target web --out-dir pkg && python3 -m http.server 8000
+```
+
+Open `http://localhost:8000/verify.html`, drop in `/tmp/demo/credential.c2pa` and `/tmp/demo/document.txt`, and click **Verify**. You'll see the verdict, the provenance report (this demo is "typed, with some pastes"), and the writing fingerprint with its replay — all computed in your browser, with the files never leaving the page.
+
 ## What we believe (and build by)
 
 These aren't slogans; they're constraints the code actually obeys.
@@ -69,7 +83,7 @@ The **core** is written in Rust and contains the entire credential format, signi
 
 ## Project status
 
-This is an early, honest preview — the foundation is real and tested, the consumer-facing apps are not finished.
+This is an early, honest preview. The credential engine and the verify experience are real and tested; the capture side — the apps you'd run *while* writing — is still rough.
 
 **Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, embedding a credential invisibly in text, and computing the ISCC durable fingerprint. An opt-in registry service for fingerprint → credential lookup, with end-to-end recovery proven. A **macOS capture tool** that runs the whole slice for real: it reads your live typing in TextEdit or Word, issues a signed credential bound to the document, and verifies it. A **browser extension** that captures the same way in ordinary web editors (typed vs. pasted, with caret position) and issues a credential through a local host, optionally attaching a self-asserted author name.
 
@@ -87,7 +101,8 @@ The whole workspace builds on macOS, Windows, and Linux.
 
 To go deeper:
 
-- **Design spec** — the full architecture and threat model: [`docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`](docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md)
+- **Design spec** — the full architecture and threat model: [`docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`](docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md), and the signals/reporting design: [`…2026-06-06-authorship-signals-and-reporting-design.md`](docs/superpowers/specs/2026-06-06-authorship-signals-and-reporting-design.md)
+- **Changelog** — what's shipped, release by release: [`CHANGELOG.md`](CHANGELOG.md)
 - **Research catalog** — every external source behind the decisions: [`docs/research/`](docs/research/)
 
 ## Questions people ask
