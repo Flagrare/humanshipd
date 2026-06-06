@@ -206,7 +206,8 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 
 **Phase 4 — Identity & sharing polish. ◧ in progress.**
 - ✅ **Self-asserted author name** — a signed (tamper-evident) but *unverified* `org.humanshipd.author` assertion, captured via the extension popup / host / example and shown on the verify page labeled "self-asserted, not independently verified". `CreativeWork` was rejected (deprecated in c2pa); a small custom assertion is honest for a name we cannot verify.
-- *Remaining:* **CAWG Identity Assertion v1.2** for *verified* author identity (needs a real identity signer — X.509 cert or claim aggregator; genuinely separate from the self-asserted name above). Per-contributor attribution; shareable signed report view + downloadable PDF (trust-by-crypto); citation helper for `pasted` spans with known sources; opt-in, locally-held encrypted text log for glyph-level local replay (§7.4).
+- ✅ **Shareable report** — a one-click "Save as PDF / print" on the verify page (print stylesheet hides the interactive controls); trust-by-crypto, since the `.c2pa` credential itself remains the re-verifiable artifact.
+- *Remaining (post-MVP):* **CAWG Identity Assertion v1.2** for *verified* author identity (needs a real identity signer — X.509 cert or claim aggregator; genuinely separate from the self-asserted name above). Per-contributor attribution and a paste-source citation helper both depend on capture-layer data we don't yet record (per-editor identity; paste origin, which browsers don't expose). Opt-in, locally-held encrypted text log for glyph-level local replay (§7.4).
 
 **Research track (unscheduled).** Zero-knowledge process attestation (prove "process features fall in human range" without revealing timing) — the ZK-PoP direction, as a privacy upgrade.
 

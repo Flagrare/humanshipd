@@ -71,9 +71,19 @@ The **core** is written in Rust and contains the entire credential format, signi
 
 This is an early, honest preview — the foundation is real and tested, the consumer-facing apps are not finished.
 
-**Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, embedding a credential invisibly in text, and computing the ISCC durable fingerprint. An opt-in registry service for fingerprint → credential lookup, with end-to-end recovery proven. A **macOS capture tool** that runs the whole slice for real: it reads your live typing in TextEdit or Word, issues a signed credential bound to the document, and verifies it. A **browser extension** that captures the same way in ordinary web editors (typed vs. pasted) and issues a credential through a local host. And a **browser verify page** that checks a credential entirely client-side, by compiling the very same verification logic to WebAssembly — the browser shows the same verdict and honest claim as the CLI. The whole workspace builds on macOS, Windows, and Linux.
+**Working today:** the Rust core — building the process summary, issuing a signed C2PA credential bound to a file, verifying it, embedding a credential invisibly in text, and computing the ISCC durable fingerprint. An opt-in registry service for fingerprint → credential lookup, with end-to-end recovery proven. A **macOS capture tool** that runs the whole slice for real: it reads your live typing in TextEdit or Word, issues a signed credential bound to the document, and verifies it. A **browser extension** that captures the same way in ordinary web editors (typed vs. pasted, with caret position) and issues a credential through a local host, optionally attaching a self-asserted author name.
 
-**Not built yet:** native Windows/Linux capture adapters, a dedicated Google Docs capture path, an on-screen capture UI, and named-author identity (a cryptographically attested human author).
+And a **browser verify page** that checks a credential entirely client-side — the very same verification logic compiled to WebAssembly, so the browser shows the same verdict as the command line. When a credential is valid it also reads back, from the signed record:
+
+- a **provenance report** — what share of the words were typed, pasted, or never captured (word-count proportions, not a guess about AI);
+- a **writing fingerprint** — edit position over time, where a paste is a vertical jump and a revisit dips back, with a scrubbable replay and jump-to-paste markers;
+- a **process-shape** panel — weak, positive-only corroboration of a human-like drafting rhythm (it never claims "this is AI");
+- a **self-asserted author name**, shown plainly as "not independently verified";
+- and a one-click **Save as PDF / print** for a shareable report.
+
+The whole workspace builds on macOS, Windows, and Linux.
+
+**Not built yet:** native Windows/Linux capture adapters, a dedicated Google Docs capture path, an on-screen capture UI, and — the big one — **cryptographically verified author identity** (today's author name is self-asserted; real verification needs an external identity authority, which a local-only tool can't provide alone). Per-contributor attribution and a paste-source citation helper are likewise parked until the capture layer records who and where.
 
 To go deeper:
 
