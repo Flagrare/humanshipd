@@ -16,6 +16,16 @@
       .claim { margin-top: 8px; }
       dl { margin-top: 10px; font-size: 13px; color: #444; }
       dt { font-weight: 600; } dd { margin: 0 0 6px; word-break: break-all; }
+      .report { margin-top: 18px; }
+      .report h2 { font-size: 14px; margin: 0 0 4px; }
+      .summary { font-weight: 600; margin-bottom: 10px; }
+      .band { display: grid; grid-template-columns: 180px 48px 1fr; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
+      .bar { height: 10px; border-radius: 5px; background: #ccc; }
+      .bar.typed { background: #137333; }
+      .bar.pasted { background: #e8a33d; }
+      .bar.ai_tool { background: #b3261e; }
+      .bar.unknown { background: #9aa0a6; }
+      .report .note { font-size: 12px; color: #666; margin-top: 8px; }
     </style>
   </head>
   <body>
@@ -37,6 +47,7 @@
       <div class="verdict" id="verdict"></div>
       <div class="claim" id="claim"></div>
       <dl id="details"></dl>
+      <div class="report" id="report"></div>
     </div>
 
     <script type="module">
@@ -56,6 +67,21 @@
         return new Uint8Array(await file.arrayBuffer());
       }
 
+      // Fixed label/class maps — provenance & summary are enum strings from the
+      // credential; we map only known values so nothing untrusted reaches the DOM.
+      const BAND_LABELS = {
+        typed: "Typed in a tracked editor",
+        pasted: "Pasted",
+        ai_tool: "From an AI tool",
+        unknown: "Unknown (not captured)",
+      };
+      const SUMMARY_LABELS = {
+        fully_typed: "Fully typed",
+        typed_with_pastes: "Typed, with some pastes",
+        mostly_pasted: "Mostly pasted",
+        unverified: "Unverified — substantial content was not captured",
+      };
+
       function render(out) {
         result.style.display = "block";
         result.className = out.valid ? "valid" : "invalid";
@@ -69,7 +95,9 @@
         // Build details with textContent (never innerHTML): the values come from a
         // dropped credential, which could be hostile — treat them as untrusted data.
         const details = document.getElementById("details");
+        const report = document.getElementById("report");
         details.replaceChildren();
+        report.replaceChildren();
         if (out.error) return;
         const rows = [
           ["Document SHA-256", out.document_sha256],
@@ -83,6 +111,53 @@
           dd.textContent = value;
           details.append(dt, dd);
         }
+
+        // Only show the provenance report when the credential is valid for THIS
+        // document — otherwise the bands describe the credential's own session,
+        // not the document on screen, which would mislead.
+        if (out.valid) renderReport(report, out.report);
+      }
+
+      // Banded provenance report (signals spec §5): proportions of how text
+      // entered, NOT a probability the text is AI. Built with textContent only.
+      function renderReport(container, report) {
+        if (!report) return;
+
+        const heading = document.createElement("h2");
+        heading.textContent = "How this document was written";
+        container.append(heading);
+
+        const summary = document.createElement("div");
+        summary.className = "summary";
+        summary.textContent = SUMMARY_LABELS[report.summary] || "Unknown";
+        container.append(summary);
+
+        for (const band of report.bands) {
+          const pct = Math.round((band.fraction || 0) * 100);
+          const row = document.createElement("div");
+          row.className = "band";
+
+          const label = document.createElement("span");
+          label.textContent = BAND_LABELS[band.provenance] || band.provenance;
+
+          const value = document.createElement("span");
+          value.textContent = `${pct}%`;
+
+          const track = document.createElement("span");
+          const bar = document.createElement("span");
+          bar.className = "bar " + (BAND_LABELS[band.provenance] ? band.provenance : "unknown");
+          bar.style.width = pct + "%";
+          track.append(bar);
+
+          row.append(label, value, track);
+          container.append(row);
+        }
+
+        const note = document.createElement("div");
+        note.className = "note";
+        note.textContent =
+          "Proportions describe how text entered the document (typed vs. pasted vs. not captured) — not a guess about whether it is AI-written.";
+        container.append(note);
       }
 
       button.addEventListener("click", async () => {

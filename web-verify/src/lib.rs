@@ -3,6 +3,7 @@
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
 use humanshipd_core::credential::read_sidecar;
+use humanshipd_core::report::{render_report, ProvenanceReport};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -13,6 +14,9 @@ struct VerifyResult {
     document_sha256: String,
     char_count: u64,
     ai_dump_flags: u64,
+    /// Banded provenance report (signals spec §5); present only when the
+    /// credential reads successfully.
+    report: Option<ProvenanceReport>,
     error: Option<String>,
 }
 
@@ -23,9 +27,10 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
         Ok(readout) => VerifyResult {
             valid: readout.valid,
             claim: readout.claim,
-            document_sha256: readout.record.document_binding.final_text_sha256,
+            document_sha256: readout.record.document_binding.final_text_sha256.clone(),
             char_count: readout.record.document_binding.char_count,
             ai_dump_flags: readout.record.evidence_flags.large_unkeyed_insertions,
+            report: Some(render_report(&readout.record)),
             error: None,
         },
         Err(e) => VerifyResult {
@@ -34,6 +39,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             document_sha256: String::new(),
             char_count: 0,
             ai_dump_flags: 0,
+            report: None,
             error: Some(e.to_string()),
         },
     };
