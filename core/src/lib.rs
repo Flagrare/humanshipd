@@ -9,6 +9,7 @@ pub mod canonical;
 pub mod credential;
 pub mod error;
 pub mod fingerprint;
+pub mod gdocs;
 pub mod record;
 pub mod report;
 pub mod session;
@@ -29,5 +30,6 @@ pub use report::{
     ProvenanceReport, ReportBand,
 };
 pub use fingerprint::{text_iscc, text_soft_binding, SoftBinding, ISCC_ALG};
+pub use gdocs::session_from_changelog;
 pub use session::{build_record, EditEvent, SessionInput, LARGE_UNKEYED_THRESHOLD};
 pub use text_embed::{embed, extract, strip};
