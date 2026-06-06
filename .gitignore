@@ -3,7 +3,11 @@
 
 # Rust build artifacts (Cargo.lock is committed — workspace has binaries)
 /target/
+web-verify/target/
 **/*.rs.bk
+
+# WASM build output (regenerate with `wasm-pack build`)
+web-verify/pkg/
 
 # Node / Playwright (extension tests)
 node_modules/

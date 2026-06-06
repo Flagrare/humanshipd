@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>humanshipd — verify a credential</title>
+    <style>
+      body { font: 15px/1.6 -apple-system, system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+      h1 { font-size: 20px; }
+      p.note { color: #555; }
+      label { display: block; margin: 14px 0 4px; font-weight: 600; }
+      button { margin-top: 18px; padding: 9px 16px; font-size: 15px; cursor: pointer; }
+      #result { margin-top: 22px; padding: 16px; border-radius: 8px; display: none; }
+      #result.valid { background: #e6f4ea; border: 1px solid #137333; }
+      #result.invalid { background: #fce8e6; border: 1px solid #b3261e; }
+      .verdict { font-weight: 700; font-size: 16px; }
+      .claim { margin-top: 8px; }
+      dl { margin-top: 10px; font-size: 13px; color: #444; }
+      dt { font-weight: 600; } dd { margin: 0 0 6px; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <h1>Verify a Human Authored credential</h1>
+    <p class="note">
+      Everything runs in your browser — the document and credential never leave this
+      page. Verification uses the exact same engine as the command-line tool.
+    </p>
+
+    <label for="credential">Credential (<code>.c2pa</code>)</label>
+    <input id="credential" type="file" />
+
+    <label for="document">The document it should belong to</label>
+    <input id="document" type="file" />
+
+    <button id="verify" disabled>Verify</button>
+
+    <div id="result">
+      <div class="verdict" id="verdict"></div>
+      <div class="claim" id="claim"></div>
+      <dl id="details"></dl>
+    </div>
+
+    <script type="module">
+      import init, { verify_credential } from "./pkg/humanshipd_web_verify.js";
+
+      const button = document.getElementById("verify");
+      const result = document.getElementById("result");
+
+      await init();
+      // Expose for automated tests; harmless for normal use.
+      window.verify_credential = verify_credential;
+      button.disabled = false;
+
+      async function bytes(input) {
+        const file = input.files[0];
+        if (!file) return null;
+        return new Uint8Array(await file.arrayBuffer());
+      }
+
+      function render(out) {
+        result.style.display = "block";
+        result.className = out.valid ? "valid" : "invalid";
+        document.getElementById("verdict").textContent = out.error
+          ? `Could not read credential: ${out.error}`
+          : out.valid
+          ? "✓ Verified"
+          : "✗ Not valid";
+        document.getElementById("claim").textContent = out.claim || "";
+        document.getElementById("details").innerHTML = out.error
+          ? ""
+          : `<dt>Document SHA-256</dt><dd>${out.document_sha256}</dd>
+             <dt>Characters</dt><dd>${out.char_count}</dd>
+             <dt>Un-keyed (paste) insertions flagged</dt><dd>${out.ai_dump_flags}</dd>`;
+      }
+
+      button.addEventListener("click", async () => {
+        const credential = await bytes(document.getElementById("credential"));
+        const doc = await bytes(document.getElementById("document"));
+        if (!credential || !doc) {
+          alert("Pick both a credential and its document.");
+          return;
+        }
+        render(verify_credential(credential, doc));
+      });
+    </script>
+  </body>
+</html>
