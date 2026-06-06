@@ -27,3 +27,17 @@ isn't readable from a content script — a Docs-specific capture path is future 
 
 Paste a chunk of text mid-session to see the AI-paste signal: the credential's
 `ai_dump_flags` count rises and the claim flips to the warning.
+
+## Tests
+
+The capture logic (typed vs. pasted classification) has a Playwright regression
+that injects the real `content.js` into a page and drives typing + a paste:
+
+```bash
+cd extension/tests && npm i && npx playwright install chromium && npm test
+```
+
+The extension → host → credential → AI-dump path is also covered by a Rust test
+(`cargo test -p humanshipd-host`), so the capture↔host contract is guarded in CI
+without a browser.
+

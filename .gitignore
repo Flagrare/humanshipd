@@ -5,6 +5,12 @@
 /target/
 **/*.rs.bk
 
+# Node / Playwright (extension tests)
+node_modules/
+test-results/
+playwright-report/
+.playwright-mcp/
+
 # OS / editor cruft
 .DS_Store
 Thumbs.db

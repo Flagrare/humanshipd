@@ -1,0 +1,7 @@
+{
+  "name": "humanshipd-extension-tests",
+  "private": true,
+  "description": "Playwright regression for the content-script capture logic.",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "^1.49.0" }
+}

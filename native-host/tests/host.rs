@@ -52,6 +52,43 @@ fn issue_request_produces_a_verifying_credential() {
 }
 
 #[test]
+fn extension_shaped_session_with_a_paste_flags_ai_dump() {
+    // Mirrors the browser smoke test: a typed prefix followed by a large paste
+    // (keystroke-less) must yield a verifying credential whose claim warns of the
+    // un-keyed insertion — the AI-dump signal end to end.
+    let json = r#"{
+        "type": "issue",
+        "session_id": "web-1",
+        "surface_kind": "web",
+        "surface_app": "web",
+        "final_text": "typed prefix PASTED-AI-BLOCK-OF-FORTY-PLUS-CHARACTERS-XX",
+        "events": [
+            {"at_ms": 100, "inserted_chars": 6, "deleted_chars": 0, "keystrokes": 6},
+            {"at_ms": 400, "inserted_chars": 7, "deleted_chars": 0, "keystrokes": 7},
+            {"at_ms": 700, "inserted_chars": 41, "deleted_chars": 0, "keystrokes": 0}
+        ]
+    }"#;
+    let request: Request = serde_json::from_str(json).unwrap();
+
+    match process(request) {
+        Response::Credential { manifest_b64 } => {
+            let manifest = base64::engine::general_purpose::STANDARD
+                .decode(manifest_b64)
+                .unwrap();
+            let readout = read_sidecar(
+                &manifest,
+                b"typed prefix PASTED-AI-BLOCK-OF-FORTY-PLUS-CHARACTERS-XX",
+            )
+            .unwrap();
+            assert!(readout.valid);
+            assert!(readout.record.evidence_flags.large_unkeyed_insertions >= 1);
+            assert!(readout.claim.contains("WARNING"));
+        }
+        other => panic!("expected a credential, got {other:?}"),
+    }
+}
+
+#[test]
 fn malformed_request_type_is_an_error_not_a_panic() {
     let request: Request = serde_json::from_str(r#"{"type":"frobnicate"}"#).unwrap();
     assert!(matches!(process(request), Response::Error { .. }));
