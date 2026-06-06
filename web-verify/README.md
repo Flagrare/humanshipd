@@ -38,9 +38,13 @@ summary — and a **writing fingerprint graph**: edit position over time when th
 carries per-edit offsets (a paste is a vertical jump, a revisit to earlier text
 dips back down), falling back to document length otherwise. The graph has a
 **scrubbable replay** (play/pause, speed) and **jump-to-paste markers**, all
-content-free (offsets, counts, timestamps — never text). The bands describe
-*provenance*, not a guess about whether the text is AI-written, and the report and
-graph appear only when the credential is valid for the document.
+content-free (offsets, counts, timestamps — never text). Finally, a muted
+**process-shape** panel offers weak, positive-only corroboration of a human-like
+drafting rhythm (planning pauses, revisions, bursts) — it can affirm "consistent
+with incremental composition" but never says "looks like AI", and its absence is
+explicitly not evidence of AI. The bands describe *provenance*, not a guess about
+whether the text is AI-written, and the report, graph, and panel appear only when
+the credential is valid for the document.
 
 To generate a fixture for manual testing:
 

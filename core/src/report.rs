@@ -10,6 +10,14 @@
 use crate::record::{Provenance, WritingSessionRecord};
 use serde::{Deserialize, Serialize};
 
+/// Minimum document length before process-shape is even assessed (signals spec §6,
+/// Tier 2). Below this there is too little material to say anything.
+const PROCESS_SHAPE_MIN_CHARS: u64 = 80;
+/// Planning pauses needed to count the pause-rhythm signal as present.
+const PROCESS_SHAPE_MIN_PAUSES: u64 = 2;
+/// Distinct writing bursts needed to count the segmentation signal as present.
+const PROCESS_SHAPE_MIN_BURSTS: u64 = 3;
+
 /// One row of the report: a provenance class, its character count, and its share.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReportBand {
@@ -122,4 +130,61 @@ fn summarize(total: u64, typed: u64, non_typed: u64, unknown: u64) -> NuanceSumm
     }
     let _ = typed;
     NuanceSummary::FullyTyped
+}
+
+// ---- Process-shape corroboration (Tier 2, positive-only) -------------------
+//
+// A deliberately humble, secondary signal (signals spec §3 Tier 2 / §6). It can
+// *corroborate* a human-like drafting rhythm — planning pauses, revisions, and
+// writing arriving in bursts rather than one block — but its ABSENCE is never
+// evidence of AI: a careful, fluent typist also writes cleanly. So the assessment
+// is only ever `IncrementalComposition` (corroborated) or `Inconclusive` — there is
+// no "looks like AI" verdict, by design. The underlying signal is weak and
+// spoofable (keystroke-process humanness shows ~18–48% error rates in the
+// literature), so callers must present it as supporting context, never proof.
+
+/// The qualitative process-shape outcome. Never accuses; only corroborates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessAssessment {
+    /// Multiple human-drafting signals are present (weak positive corroboration).
+    IncrementalComposition,
+    /// Too little signal to corroborate — NOT evidence of AI.
+    Inconclusive,
+}
+
+/// Weak, content-free corroboration of a human-like writing process (Tier 2).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProcessShape {
+    /// Planning pauses were present in the session.
+    pub pause_rhythm: bool,
+    /// The writer revised — deletions or in-place reformulations.
+    pub revision_activity: bool,
+    /// Text arrived in several bursts rather than one uninterrupted block.
+    pub burst_segmentation: bool,
+    /// How many of the three signals are present (0–3).
+    pub signals_present: u8,
+    pub assessment: ProcessAssessment,
+}
+
+/// Derive the positive-only process-shape corroboration from a record's existing
+/// content-free stats. No new capture; never emits an AI verdict.
+pub fn render_process_shape(record: &WritingSessionRecord) -> ProcessShape {
+    let p = &record.process;
+    let pause_rhythm = p.pauses.gt_2s >= PROCESS_SHAPE_MIN_PAUSES;
+    let revision_activity = p.revisions.deletions >= 1 || p.revisions.reformulations >= 1;
+    let burst_segmentation = p.bursts.count >= PROCESS_SHAPE_MIN_BURSTS;
+    let signals_present =
+        [pause_rhythm, revision_activity, burst_segmentation].iter().filter(|b| **b).count() as u8;
+
+    // Require a minimum of material AND at least two corroborating signals before
+    // claiming incremental composition; otherwise stay Inconclusive (never "AI").
+    let enough_material = record.document_binding.char_count >= PROCESS_SHAPE_MIN_CHARS;
+    let assessment = if enough_material && signals_present >= 2 {
+        ProcessAssessment::IncrementalComposition
+    } else {
+        ProcessAssessment::Inconclusive
+    };
+
+    ProcessShape { pause_rhythm, revision_activity, burst_segmentation, signals_present, assessment }
 }

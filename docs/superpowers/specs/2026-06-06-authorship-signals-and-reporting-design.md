@@ -200,8 +200,9 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 - ✅ Scrubber + speed-control structural replay (progressive reveal; content-free geometry).
 - *Remaining (later):* per-contributor attribution; opt-in glyph-level local replay (§7.4).
 
-**Phase 3 — Process-shape corroboration (Tier 2, clearly bounded).**
-- P-burst/R-burst + pause-location analysis surfaced as a *corroborating* "human-like process" indicator with its stated error band — never as identity or anti-AI proof.
+**Phase 3 — Process-shape corroboration (Tier 2, clearly bounded). ✅ shipped (positive-only).**
+- ✅ `render_process_shape()` derives three content-free signals — planning pauses, revision activity, burst segmentation — from existing record stats. The assessment is only ever `IncrementalComposition` (weak positive corroboration) or `Inconclusive`; there is **no "looks like AI" verdict**, by design. Surfaced on the verify page as a muted, secondary panel with a loud caveat (weak, spoofable, 18–48% error; absence ≠ AI).
+- *Resolved open question:* Phase 3 is worth shipping **only** in this positive-corroboration-only form — it can affirm a human-like process but must never imply AI from its absence.
 
 **Phase 4 — Identity & sharing polish.**
 - CAWG Identity Assertion v1.2 (named-author identity).
@@ -214,6 +215,6 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 
 - Span change-point thresholds (paste-size minimum, burst gap) — privacy/signal tradeoff; reuse base spec §10's burst/pause bucketing decision.
 - Exact wording of the four-tier nuance labels (must stay descriptive, never accusatory).
-- Whether Phase-3 process-shape corroboration is worth the false-positive risk at all, or should remain research-only.
+- ~~Whether Phase-3 process-shape corroboration is worth the false-positive risk at all~~ — **resolved:** shipped positive-corroboration-only (`IncrementalComposition` / `Inconclusive`, never an AI verdict).
 - Coarse `source` taxonomy for pasted spans (how much origin detail without leaking context).
 - Confirm the C2PA unstructured-text appendix letter for our targeted spec version (§9).

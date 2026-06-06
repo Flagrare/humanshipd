@@ -4,7 +4,7 @@
 
 use humanshipd_core::credential::read_sidecar;
 use humanshipd_core::record::TimelinePoint;
-use humanshipd_core::report::{render_report, ProvenanceReport};
+use humanshipd_core::report::{render_process_shape, render_report, ProcessShape, ProvenanceReport};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
@@ -20,6 +20,8 @@ struct VerifyResult {
     report: Option<ProvenanceReport>,
     /// Content-free writing timeline for the fingerprint graph (signals spec §7).
     timeline: Vec<TimelinePoint>,
+    /// Weak, positive-only process-shape corroboration (signals spec §3 Tier 2 / §6).
+    process_shape: Option<ProcessShape>,
     error: Option<String>,
 }
 
@@ -35,6 +37,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             ai_dump_flags: readout.record.evidence_flags.large_unkeyed_insertions,
             report: Some(render_report(&readout.record)),
             timeline: readout.record.process.timeline.clone(),
+            process_shape: Some(render_process_shape(&readout.record)),
             error: None,
         },
         Err(e) => VerifyResult {
@@ -45,6 +48,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
             ai_dump_flags: 0,
             report: None,
             timeline: Vec::new(),
+            process_shape: None,
             error: Some(e.to_string()),
         },
     };

@@ -39,6 +39,11 @@
       .controls input[type="range"] { flex: 1; }
       .pastes { margin-top: 8px; font-size: 12px; color: #555; }
       .pastes .marker { display: inline-block; margin: 2px 6px 2px 0; padding: 2px 8px; border: 1px solid #e8a33d; border-radius: 12px; background: #fdf3e3; color: #8a5a12; cursor: pointer; }
+      .shape { margin-top: 20px; padding: 12px 14px; border: 1px dashed #cfcfcf; border-radius: 6px; background: #f6f6f6; color: #444; }
+      .shape h2 { font-size: 13px; margin: 0 0 6px; color: #555; }
+      .shape .assessment { font-weight: 600; font-size: 13px; }
+      .shape ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; }
+      .shape .caveat { font-size: 12px; color: #777; margin-top: 8px; }
     </style>
   </head>
   <body>
@@ -62,6 +67,7 @@
       <dl id="details"></dl>
       <div class="report" id="report"></div>
       <div class="fingerprint" id="fingerprint"></div>
+      <div class="shape" id="shape" style="display: none"></div>
     </div>
 
     <script type="module">
@@ -111,9 +117,12 @@
         const details = document.getElementById("details");
         const report = document.getElementById("report");
         const fingerprint = document.getElementById("fingerprint");
+        const shape = document.getElementById("shape");
         details.replaceChildren();
         report.replaceChildren();
         fingerprint.replaceChildren();
+        shape.replaceChildren();
+        shape.style.display = "none";
         if (out.error) return;
         const rows = [
           ["Document SHA-256", out.document_sha256],
@@ -134,7 +143,49 @@
         if (out.valid) {
           renderReport(report, out.report);
           renderFingerprint(fingerprint, out.timeline);
+          renderProcessShape(shape, out.process_shape);
         }
+      }
+
+      // Process-shape corroboration (signals spec §3 Tier 2 / §6) — deliberately
+      // secondary and muted. It can only ever *corroborate* a human-like drafting
+      // rhythm; it NEVER says "this looks like AI". Absence of signal is shown as
+      // "inconclusive", with a loud caveat that the signal is weak and spoofable.
+      const SHAPE_ASSESSMENT = {
+        incremental_composition: "Consistent with incremental human composition",
+        inconclusive: "Inconclusive — not enough signal (this is not evidence of AI)",
+      };
+      const SHAPE_SIGNALS = [
+        ["pause_rhythm", "Planning pauses while writing"],
+        ["revision_activity", "Revised the text (edits / deletions)"],
+        ["burst_segmentation", "Text arrived in several bursts, not one block"],
+      ];
+      function renderProcessShape(container, shapeData) {
+        if (!shapeData) return;
+        container.style.display = "block";
+
+        const heading = document.createElement("h2");
+        heading.textContent = "Process shape (weak corroboration)";
+        container.append(heading);
+
+        const assessment = document.createElement("div");
+        assessment.className = "assessment";
+        assessment.textContent = SHAPE_ASSESSMENT[shapeData.assessment] || "Inconclusive";
+        container.append(assessment);
+
+        const list = document.createElement("ul");
+        for (const [key, label] of SHAPE_SIGNALS) {
+          const li = document.createElement("li");
+          li.textContent = `${shapeData[key] ? "✓" : "—"} ${label}`;
+          list.append(li);
+        }
+        container.append(list);
+
+        const caveat = document.createElement("div");
+        caveat.className = "caveat";
+        caveat.textContent =
+          "Supporting context only — not proof. Process-based humanness is weak and spoofable (studies report 18–48% error rates), and a fluent, clean typist can show little of it. Absence of these signals is never evidence that text is AI-generated.";
+        container.append(caveat);
       }
 
       // Draftback-style writing fingerprint (signals spec §7), with a paste timeline

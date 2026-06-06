@@ -23,7 +23,10 @@ pub use record::{
     ProvenanceSpan, Replay, RevisionStats, Surface, TimelinePoint, UnkeyedInsertion,
     WritingSessionRecord, SCHEMA,
 };
-pub use report::{render_report, NuanceSummary, ProvenanceReport, ReportBand};
+pub use report::{
+    render_process_shape, render_report, NuanceSummary, ProcessAssessment, ProcessShape,
+    ProvenanceReport, ReportBand,
+};
 pub use fingerprint::{text_iscc, text_soft_binding, SoftBinding, ISCC_ALG};
 pub use session::{build_record, EditEvent, SessionInput, LARGE_UNKEYED_THRESHOLD};
 pub use text_embed::{embed, extract, strip};

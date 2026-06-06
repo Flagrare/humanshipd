@@ -1,6 +1,8 @@
 use humanshipd_core::credential::{issue_sidecar, read_sidecar};
 use humanshipd_core::record::Provenance;
-use humanshipd_core::report::{render_report, NuanceSummary};
+use humanshipd_core::report::{
+    render_process_shape, render_report, NuanceSummary, ProcessAssessment,
+};
 use humanshipd_core::session::{build_record, EditEvent, SessionInput};
 
 fn session(final_text: &str, events: Vec<EditEvent>) -> SessionInput {
@@ -131,6 +133,53 @@ fn a_deletion_dips_the_timeline_length() {
     let timeline = &record.process.timeline;
     assert_eq!(timeline[0].length, 20);
     assert_eq!(timeline[1].length, 15, "a deletion lowers cumulative length");
+}
+
+fn evt(at_ms: u64, inserted: u64, deleted: u64, keystrokes: u64) -> EditEvent {
+    EditEvent { at_ms, inserted_chars: inserted, deleted_chars: deleted, keystrokes, at_offset: None }
+}
+
+#[test]
+fn a_richly_drafted_session_corroborates_incremental_composition() {
+    // Planning pauses (>2s gaps), a deletion, and several bursts over enough text.
+    let text = "x".repeat(90);
+    let record = build_record(&session(
+        &text,
+        vec![
+            evt(500, 30, 0, 30),
+            evt(3000, 30, 0, 30), // pause > 2s
+            evt(3500, 0, 5, 5),   // a revision (deletion)
+            evt(6000, 35, 0, 35), // pause > 2s
+        ],
+    ));
+    let shape = render_process_shape(&record);
+    assert!(shape.pause_rhythm);
+    assert!(shape.revision_activity);
+    assert!(shape.burst_segmentation);
+    assert_eq!(shape.signals_present, 3);
+    assert_eq!(shape.assessment, ProcessAssessment::IncrementalComposition);
+}
+
+#[test]
+fn a_single_paste_dump_is_inconclusive_never_an_ai_verdict() {
+    // No pauses, no revisions, one block — the assessment is Inconclusive, NOT "AI".
+    let text = "x".repeat(90);
+    let record = build_record(&session(&text, vec![evt(100, 90, 0, 0)]));
+    let shape = render_process_shape(&record);
+    assert!(!shape.pause_rhythm);
+    assert!(!shape.revision_activity);
+    assert!(!shape.burst_segmentation);
+    assert_eq!(shape.assessment, ProcessAssessment::Inconclusive);
+}
+
+#[test]
+fn too_little_text_stays_inconclusive() {
+    let text = "x".repeat(20); // below the minimum material threshold
+    let record = build_record(&session(&text, vec![evt(100, 20, 0, 20)]));
+    assert_eq!(
+        render_process_shape(&record).assessment,
+        ProcessAssessment::Inconclusive
+    );
 }
 
 #[test]

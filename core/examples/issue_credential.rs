@@ -40,6 +40,23 @@ impl Editor {
         });
     }
 
+    fn delete(&mut self, offset: usize, n: usize, gap_ms: u64) {
+        self.at_ms += gap_ms;
+        self.buf.splice(offset..offset + n, std::iter::empty());
+        self.events.push(EditEvent {
+            at_ms: self.at_ms,
+            inserted_chars: 0,
+            deleted_chars: n as u64,
+            keystrokes: n as u64,
+            at_offset: Some(offset as u64),
+        });
+    }
+
+    /// A planning pause (no edit) before the next action.
+    fn pause(&mut self, ms: u64) {
+        self.at_ms += ms;
+    }
+
     /// Type `text` at the end in ≈5-char bursts.
     fn type_bursts(&mut self, text: &str) {
         for chunk in text.chars().collect::<Vec<_>>().chunks(5) {
@@ -62,18 +79,22 @@ fn main() {
 
     let mut ed = Editor::new();
     ed.type_bursts("Renewable energy is reshaping how economies allocate capital. ");
+    ed.pause(2500); // a planning pause (>2s) — the pause-rhythm signal
     // A pasted block appended without keystrokes (the AI-dump signal).
     let paste_at = ed.buf.len();
     ed.insert(
         paste_at,
         "Countries investing in renewable technologies stand to gain a competitive edge. ",
         false,
-        1500,
+        0,
     );
     ed.type_bursts("That shift is already visible in grid-scale procurement decisions.");
-    // A mid-document revisit: insert a word back near the start (offset 10) — this
-    // is the case a position-aware fingerprint reveals that a length-only one cannot.
-    ed.insert(10, "clean ", true, 1200);
+    ed.pause(2500); // a second planning pause
+    // A mid-document typo and its correction (a revision back near the start) — this
+    // exercises both the revision signal and the position-aware fingerprint's dip.
+    ed.insert(10, "kleen ", true, 400);
+    ed.delete(10, 6, 500);
+    ed.insert(10, "clean ", true, 400);
 
     let document = ed.document();
     let record = build_record(&SessionInput {
