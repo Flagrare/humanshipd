@@ -190,7 +190,8 @@ Phased so each phase ships something verifiable on its own. Phases 0–1 are the
 - ✅ `WritingSessionRecord.process.spans[]` (order-based; schema `@0.2`) built in `build_record` (§4).
 - ✅ `render_report()` → word-count proportion bands + four-tier nuance summary, with final-document `unknown` derived (§5).
 - ✅ Emit IPTC `digitalCreation` (corrected from `digitalCapture`) in the C2PA manifest (§9).
-- *Remaining:* surface the report in the verify page / popup UI; offset-based spans + `source`/`ai_tool` once adapters emit position and origin.
+- ✅ Surfaced in the verify page (banded report rendered from the validated record; shown only when valid).
+- *Remaining:* surface the report in the extension popup; offset-based spans + `source`/`ai_tool` once adapters emit position and origin.
 
 **Phase 2 — Content-free visualization.**
 - Structural replay + Draftback-style position-vs-time fingerprint graph + paste timeline with jump-to-paste markers (§7.1–7.3).
