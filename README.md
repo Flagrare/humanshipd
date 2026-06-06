@@ -58,13 +58,13 @@ These aren't slogans; they're constraints the code actually obeys.
 
 ## How the certificate can travel with your work
 
-A certificate is only useful if it stays attached to the document. There are three ways it can, in increasing order of robustness — the first is built today, the others are planned:
+A certificate is only useful if it stays attached to the document. There are three ways it can, in increasing order of robustness — and all three are implemented today; the only piece that isn't always on is the opt-in lookup service in the third.
 
-The simplest is a **sidecar file** — a small `.c2pa` companion that travels next to your document and binds to it by fingerprint. This works for any file type (a PDF, an EPUB, a `.txt`) and is what's implemented now.
+1. **Sidecar file** — the simplest. A small `.c2pa` companion travels next to your document and binds to it by fingerprint. It works for any file type (a PDF, an EPUB, a `.txt`), and it's the default the tools produce now.
+2. **Invisible characters in the text itself** — for plain text that needs to carry its proof *inside* it, the credential is woven in as non-printing Unicode marks (a method defined in the C2PA standard). The text looks identical and survives copy-paste, but now carries its own certificate. The encoder is built and tested.
+3. **Content fingerprint** — the most durable. Each credential also carries an **ISCC** code (an ISO-standard "content code" that recognizes a document even after light edits or reformatting), so a stripped-down copy can be matched back to its certificate through an opt-in lookup service. The fingerprint is built into every credential; only that lookup service involves a server, and even then it sees fingerprints, never your text.
 
-For plain text that needs to carry its proof *inside itself*, the credential can be woven into the text as **invisible characters** (a method defined in the C2PA standard using non-printing Unicode marks). The text looks identical and survives copy-paste, but now carries its own certificate. The encoder for this is built and tested.
-
-The most durable approach adds a **content fingerprint** (using ISCC, an ISO-standard "content code" that recognizes a document even after light edits or reformatting) plus an opt-in lookup service, so a stripped-down copy can still be matched back to its certificate. The fingerprint is now built into every credential; the lookup service is the only piece that involves a server, and even then it only ever sees fingerprints, never your text.
+One honest caveat on all three: matching a credential to a document is only *crisp* when the bytes are identical. The same writing re-saved into another format (`.docx`, `.pdf`, `.rtf`) won't match by exact hash today — wiring the ISCC fingerprint into verification so "same writing, different format" verifies is the next planned step ([content-binding design](docs/superpowers/specs/2026-06-06-content-binding-and-capture-fidelity-design.md)).
 
 ## Architecture
 
