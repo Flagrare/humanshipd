@@ -3,7 +3,7 @@
 All notable changes to humanshipd are recorded here. The project is a
 research-grade preview; versions are milestones, not releases on crates.io.
 
-## [Unreleased] — MVP
+## [0.1.0] — 2026-06-06 — MVP
 
 The first end-to-end slice: capture a writing process, issue a signed credential,
 and verify it in the browser with an honest, content-free report.
