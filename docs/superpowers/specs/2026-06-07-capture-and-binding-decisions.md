@@ -60,6 +60,8 @@ Every decision below resolves uncertainty the same way the project resolves ever
 
 **✅ Validated (2026-06-07):** spike over our existing `iscc-lib` Text-Code. Same writing with PDF-style line wraps and `.docx`-style double-spaces/space-before-punctuation produced the **identical** code (**Hamming 0/64**); a one-word edit was **15/64**; genuinely different writing was **29/64**. Clear separation between *same / lightly-edited / different* — so a published Hamming threshold (with a borderline band) is well-founded. *Caveat:* a 64-bit code is coarse and the exact thresholds need corpus calibration, not a single example; pairing with a winnowing fingerprint for partial/containment matches remains future work.
 
+**✅ Verify path validated on a real file (2026-06-07):** exported the live test doc from Google as both `.docx` and `.txt`. A minimal OOXML extractor (unzip → `word/document.xml` → `<w:t>` runs) pulled the text from the real `.docx`; its ISCC equalled the ISCC of Google's own `.txt` export of the same doc — **Hamming 0/64** — while different writing was 31/64. So a reader dropping in their actual `.docx` lands on the same content code as the captured writing. Confirms the full cross-format verify path end-to-end (spike: `cargo run --example docx_extract`). The extractor is crude (string-scan, no headers/footers/tracked-changes handling yet) — the deterministic "which text counts" rules from the open questions still need nailing.
+
 ## Decision 5 — What one credential covers
 
 **Gap:** documents are written across many sessions; our model captured one sitting.
