@@ -21,6 +21,8 @@ Every decision below resolves uncertainty the same way the project resolves ever
 
 **Consequence accepted:** a credential for an already-written doc is weaker than a live-captured one. Honest, and matches the data.
 
+**✅ Validated live (2026-06-07):** on a real Google Doc, the `paste` event fired in the editor iframe with the pasted text readable (136 chars). A fast-typed sentence produced **no** paste event yet coalesced into a 27-char insert — above the size threshold — so size alone would have false-flagged typing as a paste, while the paste event separated them cleanly. Confirms the design. (Note: paste listeners must be attached in the editor *iframe*, not just the top document.)
+
 ## Decision 2 — Live Google Docs capture mechanism
 
 **Gap:** Live capture (now required by Decision 1) needs to read Docs' edits as they happen, but an isolated-world content script can't see the page's network calls or internals.
@@ -30,6 +32,8 @@ Every decision below resolves uncertainty the same way the project resolves ever
 - **(B) `/revisions/load` history** → **reconciliation + backfill.** At seal time, pull Docs' server-committed history to (i) cross-check the live stream and (ii) backfill edits from before capture / prior sessions.
 - **(C) Final rendered text** → **consistency gate.** Replay captured ops, reconstruct text, confirm it matches the document's actual text before hashing/binding.
 - **On disagreement** (live ≠ committed, or replay ≠ actual): **downgrade the credential's confidence and disclose** ("captured live; partially reconciled") rather than refuse to issue.
+
+**✅ Validated live (2026-06-07):** an XHR-prototype patch caught every `/save` on a real doc — even installed after page load (prototype patching is retroactive; production should still inject at `document_start` in the MAIN world for full coverage). The save body matches our `gdocs` parser (`rev` + `bundles[].commands[]`, `ty:is`/`ibi`/`s`). Typing coalesced into medium inserts (`is(27)`, `is(7)`); the 136-char paste landed as one clean `is(136)` exactly matching the paste event's length — paste event and save insert corroborate by size. *Not yet validated:* the B-reconcile and C-consistency gates end-to-end.
 
 ## Decision 3 — What the credential binds to, and how it travels
 

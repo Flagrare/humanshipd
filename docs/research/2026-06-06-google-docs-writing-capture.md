@@ -44,6 +44,17 @@ So a save carries `rev` + a `bundles` array; each bundle has `commands` (the ops
 
 **Implication:** both the live and historical paths are reachable from a content script on `docs.google.com` (the live one needs MAIN-world fetch/XHR patching; the historical one is a same-origin GET with the page's token). The recommended build is live `/save`+`bind` interception, with `/revisions/load` as the "credential for an already-written doc" import.
 
+### Paste-vs-typing validation (2026-06-07, same real doc)
+
+To validate the locked paste-detection decision, I instrumented the live doc (paste listeners on the top document + each editor iframe; an `XMLHttpRequest.prototype` patch recording `/save` bodies), then typed a sentence and pasted a 136-char block:
+
+- **The `paste` event fired in the *editor iframe*** (`iframe2`), with the clipboard text **readable** (length 136). Top-document listeners alone would miss it — paste listeners must be attached inside the editor iframe (`all_frames`).
+- **Typing coalesced** into medium inserts: `is(27)` then `is(7)`. The 27-char insert is **above** the naïve "large insert = paste" threshold (20) — so size alone *false-flags* fast typing as a paste.
+- **The paste landed as one clean `is(136)`**, exactly matching the paste event's 136 chars.
+- **The XHR-prototype patch caught every save even though it was installed after page load** (prototype patching is retroactive) — production should still inject at `document_start` in the MAIN world for guaranteed coverage of `fetch`-based calls.
+
+**Conclusion:** the `paste` event is the reliable paste signal (size alone is not), and it **corroborates by length** with the live `/save` insert. This empirically confirms decisions 1 and 2 in [`docs/superpowers/specs/2026-06-07-capture-and-binding-decisions.md`](../superpowers/specs/2026-06-07-capture-and-binding-decisions.md).
+
 ## Synthesis
 
 Google Docs capture in the browser is settled-feasible — you don't read the canvas, you read the **mutation stream**. Two mechanisms, and they're complementary:
