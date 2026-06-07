@@ -56,6 +56,8 @@ Every decision below resolves uncertainty the same way the project resolves ever
   4. **No match** — beyond threshold.
 - Verification extracts text per-format before computing the Content-Code (a format front-end feeding one matching engine).
 
+**✅ Validated (2026-06-07):** spike over our existing `iscc-lib` Text-Code. Same writing with PDF-style line wraps and `.docx`-style double-spaces/space-before-punctuation produced the **identical** code (**Hamming 0/64**); a one-word edit was **15/64**; genuinely different writing was **29/64**. Clear separation between *same / lightly-edited / different* — so a published Hamming threshold (with a borderline band) is well-founded. *Caveat:* a 64-bit code is coarse and the exact thresholds need corpus calibration, not a single example; pairing with a winnowing fingerprint for partial/containment matches remains future work.
+
 ## Decision 5 — What one credential covers
 
 **Gap:** documents are written across many sessions; our model captured one sitting.
