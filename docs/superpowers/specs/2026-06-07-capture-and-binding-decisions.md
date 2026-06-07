@@ -43,6 +43,8 @@ Every decision below resolves uncertainty the same way the project resolves ever
 - **Capture during writing, seal at export.** The credential is finalized and bound to the *finished file's* bytes at export time (you can only hash final bytes).
 - **Travel:** **embed the C2PA manifest inside the file** where the format allows it (PDF, `.docx`, EPUB, ODF); **sidecar `.c2pa` fallback** for formats without an embed slot (plain text, Google Docs). The credential rides inside the document where possible — the standard "Content Credentials" model.
 
+**⚠️ Validated (2026-06-07) — embedding is blocked by our library today.** `c2pa-rs` 0.85 implements **no** embedding for our document formats: the PDF handler's write path returns `WRITE_NOT_IMPLEMENTED` (read-only), and there is **no OOXML/`.docx`/EPUB/ODF handler at all** (only images, PDF-read, and media). The C2PA *spec* supports ZIP-based embedding since 1.4, but the Rust library hasn't shipped it. **Consequence for v1:** the **sidecar `.c2pa` is the universal binding for every document format** — the embed branch is *deferred* until c2pa-rs adds PDF-write / ZIP-based embedding (or we implement an asset handler ourselves, which would be reinventing library work — not now). The decision's *intent* stands; only its near-term realization narrows to sidecar-only.
+
 ## Decision 4 — Cross-format content identity & the verification verdict
 
 **Gap:** a credential sealed to a `.docx` won't byte-match a PDF export of the same writing; we need identity that survives reformatting plus an honest verdict.
