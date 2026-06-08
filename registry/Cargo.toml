@@ -1,6 +1,6 @@
 [package]
 name = "humanshipd-registry"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "Opt-in lookup service mapping a content fingerprint (ISCC) to its credential. Stores fingerprints + credentials only — never document content."

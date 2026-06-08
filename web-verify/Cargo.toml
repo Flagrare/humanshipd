@@ -1,6 +1,6 @@
 [package]
 name = "humanshipd-web-verify"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 description = "WASM wrapper over humanshipd-core::verify so a browser can check a credential with the exact same logic as the CLI."

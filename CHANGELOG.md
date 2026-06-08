@@ -3,6 +3,36 @@
 All notable changes to humanshipd are recorded here. The project is a
 research-grade preview; versions are milestones, not releases on crates.io.
 
+## [0.3.0] — 2026-06-08 — Honest trust & timestamping
+
+The credential now tells you exactly what its signature does and does not prove, and
+can carry an independent timestamp.
+
+### Added
+
+- **Honest trust framing.** Verification reports, separately from "is it
+  authentic," whether the signature is *trusted* (chains to a recognized authority)
+  and whether the signer's *identity* is verified. The local default is self-signed,
+  so the verify page now states plainly that it proves the document is unaltered
+  since issuance and how it was written — **not who wrote it** — rather than showing
+  a bare green "Verified."
+- **Optional RFC 3161 timestamping.** Issue a credential with a timestamp from a TSA
+  of your choice (e.g. `http://timestamp.digicert.com`) for an independent "signed
+  before this time" proof that survives certificate expiry. Opt-in and network-bound
+  — never part of the zero-telemetry default — and the attested time is shown on
+  verification, validated offline.
+
+### Public API (`humanshipd-core`)
+
+- `CredentialReadout.trust: TrustStatus { signed, trusted, identity_verified, timestamp }`.
+- `issue_sidecar_timestamped(record, file_bytes, author, tsa_url)` (native only).
+
+### Notes
+
+- Self-signed credentials remain *valid but untrusted* by design — a local-only,
+  open-source tool cannot attest identity (see the 0.2.0 threat-model framing). The
+  honest framing makes that explicit rather than implying more than a signature gives.
+
 ## [0.2.0] — 2026-06-08 — Cross-format verification
 
 Verification stops being all-or-nothing. A credential sealed to your writing now
