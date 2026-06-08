@@ -6,7 +6,8 @@ External research conducted for this project. Each entry credits the sources it 
 
 | Date | Topic | Triggered by | Informed |
 |------|-------|--------------|----------|
-| 2026-06-08 | [Credential Signing, Trust Model & the Fork-and-Forge Problem](./2026-06-08-credential-signing-trust-and-fork-and-forge.md) | Open decision A: how to sign + the fork-and-forge threat for an OSS local-only tool | Decision A; base spec §4 threat model |
+| 2026-06-08 | [Identifying the Same Document Across Sessions (Native Files)](./2026-06-08-native-document-identity.md) | Open Question B: keying the whole-document credential for native files | Decision 7 (native-file document identity) |
+| 2026-06-08 | [Credential Signing, Trust Model & the Fork-and-Forge Problem](./2026-06-08-credential-signing-trust-and-fork-and-forge.md) | Open decision A: how to sign + the fork-and-forge threat for an OSS local-only tool | Decision 6; base spec §4 threat model |
 | 2026-06-06 | [Binding a Credential to a Formatted Document & Content Identity Across Formats](./2026-06-06-document-binding-and-content-identity.md) | Pre-refactor "retain file formats" / verify-against-what decision | v1 architecture brainstrm; binding/artifact model |
 | 2026-06-06 | [World-Class Architecture Practices for the v1 Refactor](./2026-06-06-software-architecture-practices.md) | Ground the v1 refactor in ports-&-adapters, shared-core, schema discipline | v1 architecture brainstorm; crate boundaries |
 | 2026-06-06 | [Edit-Stream Models & Capture Pipeline (OT/CRDT/event-sourcing)](./2026-06-06-edit-stream-models-capture-pipeline.md) | Ground humanshipd's EditEvent/op model in battle-tested edit-stream models | `EditEvent` op model upstream of `ProcessStats`; capture-fidelity spec |

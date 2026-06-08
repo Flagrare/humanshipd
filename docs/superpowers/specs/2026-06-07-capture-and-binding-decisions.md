@@ -102,9 +102,22 @@ Every decision below resolves uncertainty the same way the project resolves ever
 
 **Consequence (already disclosed):** fork-and-forge is a permanent property, not a bug — identical to what every serious provenance system discloses. We pursue attribution + cost-raising, never prevention (base spec §4).
 
+## Decision 7 — Native-file document identity
+
+**Gap:** Decision 5 (whole-document, accumulated) needs a stable key to tie sessions together. Google Docs has a clean doc ID; native files can be renamed/moved/copied/Saved-As/format-converted, so "which document is this?" has no obvious answer.
+
+**Research-backed finding** (see [`docs/research/2026-06-08-native-document-identity.md`](../../research/2026-06-08-native-document-identity.md)): every mature system uses a **two-tier identity** — a stable `DocumentID` created once + a per-save `InstanceID` — plus a lineage edge to the predecessor. Adobe **XMP Media Management** is the canonical model, and **C2PA already reuses `xmpMM:DocumentID`/`InstanceID`** — so we adopt it rather than invent.
+
+**Locked: a layered B+C+D model, by authority tier.**
+- **D — embedded GUID = authoritative identity.** Adopt the **XMP-MM two-tier model**: `DocumentID` (created once = the session-accumulation key), `InstanceID` (per save), `OriginalDocumentID` (survives format conversion). Respect native carriers where present (Word `w15:docId`+`rsidRoot`, PDF `/ID`, EPUB `dc:identifier`). Express "new version of document X" as a **C2PA parent ingredient**. **Only D may *assert* identity.**
+- **B — OS file identity = fast hint, never authoritative.** Security-scoped bookmark (macOS) / FileID+ObjectID+USN (Windows) / (dev,ino) (Linux) to cheaply locate the file and follow live moves. Advisory — broken by copy, cross-volume move, atomic save, cloud sync.
+- **C — content fingerprint = confirmable fallback.** Exact hash + our ISCC similarity code (Decision 4) to *propose* a re-link when B is broken and D absent. **Never asserts identity alone.**
+- **Resolution order D → B → C**, with reconcile-on-disagreement: (1) D matches, content very different → *same document, new version*; (2) content matches, D differs/absent → *copy/Save-As/fork*, don't merge sessions; (3) B matches but D differs → inode/FRN reuse → D wins; (4) D matches, B elsewhere → atomic-save/move → refresh B. **Invariant:** a fast/content signal may *propose* a link; only a verified embedded GUID may *assert* identity.
+
+**Caveat:** embedded IDs aren't tamper-proof (editable/strippable) — they give *identity and lineage*, not *integrity*; the signing layer (Decision 6) binds over the `DocumentID + OS identity + content` triple.
+
 ## Out of scope / deferred (not decided here)
 
 - **The v1 refactor architecture** — crate boundaries, the ports-&-adapters capture port, the append-only `EditEvent` log as source of truth, schema-versioning discipline. The research for these is done ([architecture practices](../../research/2026-06-06-software-architecture-practices.md), [edit-stream models](../../research/2026-06-06-edit-stream-models-capture-pipeline.md)); the design is a separate, later brainstorm.
-- **Native-file document identity** (Decision 5's harder case) — open Question B; needs its own resolution when desktop capture is built.
 - **Project name** — still codenamed `humanshipd` (open Question C).
 - **Optional VPS / hosted signer** (open question) — a light server that holds the signing key would defeat *signature* forgery (key off the forkable client) and unlock **trusted** C2PA status (one CA cert for all issuances) plus attribution/rate-limiting/revocation. **But it does not close the fundamental gap:** capture stays on the client, so the server signs whatever telemetry the client sends — a forked client or a direct protocol replay can feed it fabricated process data and it will sign "garbage in, signed garbage out." A server only adds real assurance if it *witnesses* the writing (server-hosted editor), which abandons local-only + zero-telemetry and becomes a SaaS — the incumbents' model. So: a legitimate **opt-in hosted/trusted tier** (same family as the keyless+transparency-log attribution in Decision 6), never the default, and explicitly a *notary, not a witness*. Revisit if/when a hosted tier is wanted. Still does not beat the copy-type attack.
