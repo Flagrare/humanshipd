@@ -1,6 +1,6 @@
 [package]
 name = "humanshipd-host"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "Native Messaging host for humanshipd: wraps the core to issue badges from captured sessions."
