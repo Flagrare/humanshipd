@@ -87,8 +87,23 @@ Every decision below resolves uncertainty the same way the project resolves ever
 - Requires a **local, append-only per-document capture log** between sessions, keyed by a **stable document identity**: the **doc ID** for Google Docs (clean); for native files, a best-effort identity (path/heuristic) — **flagged as an open question** (see below).
 - **Coverage honesty:** pre-capture history and inter-session gaps are **backfilled from the revision log where available, else marked unknown and the confidence downgraded-and-disclosed** (Decision 2). "Whole-document" never implies complete coverage we don't have.
 
+## Decision 6 — Signing & trust model
+
+**Gap:** the credential is signed with c2pa's self-signed `EphemeralSigner` (a throwaway key). It's tamper-evident but not identity-bound, and because the tool is open-source, a fork can emit its own signed records (fork-and-forge). What do we sign with, and how do we treat trust/identity?
+
+**Research-backed finding** (see [`docs/research/2026-06-08-credential-signing-trust-and-fork-and-forge.md`](../../research/2026-06-08-credential-signing-trust-and-fork-and-forge.md)): forgery **cannot be prevented** in open-source/local-only code (Kerckhoffs; C2PA itself provides tamper-*evidence*, not prevention; only hardware/TEE or a server authority prevent it — both break local-only/zero-telemetry). C2PA distinguishes **valid** (signature verifies, tamper-evident) from **trusted** (cert chains to a CA on the C2PA trust list, ~$289/yr, coalition-gated — unreachable per-individual/OSS). A self-signed credential is the spec-anticipated **`signingCredential.untrusted`** state. The standard upgrade available without betraying the ethos is **attribution** (Sigstore/SLSA model), not prevention.
+
+**Locked:**
+- **Default: self-signed key, framed honestly** as *valid; identity unverified / untrusted*. Attests tamper-evidence + the writing process, never signer identity. Local-only, zero-telemetry, validly C2PA-structured; the verifier makes the trust call.
+- **Wire in RFC 3161 timestamping** (optional, user-supplied TSA) — the one CA-free standardized "existence proof" (signed-before-T; survives cert expiry).
+- **Pluggable identity slot** for opt-in stronger identity later — a CAWG identity-aggregation VC (incl. social-verified) or did:web — without re-architecting.
+- **Optional keyless + transparency-log attribution** (Sigstore-style) as a *future opt-in* for users who want forgery to be attributable — strictly opt-in, never the zero-telemetry default.
+- **Rejected:** mandatory CA-"trusted" / CAWG-verified identity as a default (gatekept, costly, breaks local-only/zero-telemetry).
+
+**Consequence (already disclosed):** fork-and-forge is a permanent property, not a bug — identical to what every serious provenance system discloses. We pursue attribution + cost-raising, never prevention (base spec §4).
+
 ## Out of scope / deferred (not decided here)
 
 - **The v1 refactor architecture** — crate boundaries, the ports-&-adapters capture port, the append-only `EditEvent` log as source of truth, schema-versioning discipline. The research for these is done ([architecture practices](../../research/2026-06-06-software-architecture-practices.md), [edit-stream models](../../research/2026-06-06-edit-stream-models-capture-pipeline.md)); the design is a separate, later brainstorm.
-- **Signing / trust model** beyond the current `EphemeralSigner` placeholder (real cert chain / CAWG verified identity).
-- **Native-file document identity** (Decision 5's harder case) — needs its own resolution when desktop capture is built.
+- **Native-file document identity** (Decision 5's harder case) — open Question B; needs its own resolution when desktop capture is built.
+- **Project name** — still codenamed `humanshipd` (open Question C).
