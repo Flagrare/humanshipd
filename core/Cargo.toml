@@ -24,3 +24,4 @@ wasm = ["c2pa/rust_native_crypto"]
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
 zip = "8"
+pdf-extract = "0.9"
