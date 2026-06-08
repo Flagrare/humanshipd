@@ -128,6 +128,29 @@ fn a_self_signed_credential_is_authentic_but_untrusted_and_identity_unverified()
 }
 
 #[test]
+#[ignore = "hits a live RFC 3161 TSA over the network; run manually with --ignored"]
+fn a_timestamped_credential_carries_an_attested_time() {
+    // Decision 6, Part B: an opt-in RFC 3161 timestamp adds an independent
+    // existence proof. Verified offline; the TSA cert won't be trust-listed, so the
+    // credential stays authentic-but-untrusted while gaining an attested time.
+    let file = ESSAY.as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(file);
+    let manifest =
+        credential::issue_sidecar_timestamped(&record, file, None, "http://timestamp.digicert.com")
+            .expect("issue timestamped credential");
+
+    let readout = credential::read_sidecar(&manifest, file).unwrap();
+    assert!(matches!(readout.verdict, Verdict::ExactFile), "got {:?}", readout.verdict);
+    assert!(readout.trust.signed);
+    assert!(
+        readout.trust.timestamp.is_some(),
+        "an RFC 3161 attested time should be present after timestamping"
+    );
+    println!("attested time: {:?}", readout.trust.timestamp);
+}
+
+#[test]
 fn a_docx_export_of_the_same_writing_verifies_cross_format() {
     // The full Increment-2 path: a credential is sealed to the plain text, the
     // reader drops in a .docx of the same writing, and verification extracts the

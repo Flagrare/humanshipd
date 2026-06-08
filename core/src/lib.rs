@@ -21,6 +21,8 @@ pub use credential::{
     read_sidecar_with_text, CredentialReadout, TrustStatus, Verdict, AUTHOR_ASSERTION,
     PROCESS_ASSERTION,
 };
+#[cfg(feature = "native")]
+pub use credential::issue_sidecar_timestamped;
 pub use error::CoreError;
 pub use record::{
     BurstStats, DocumentBinding, EvidenceFlags, PauseStats, ProcessStats, Provenance,

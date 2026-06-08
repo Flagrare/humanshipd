@@ -109,6 +109,34 @@ pub fn issue_sidecar_with_author(
     author: Option<&str>,
 ) -> Result<Vec<u8>, CoreError> {
     let signer = EphemeralSigner::new("humanshipd.local").map_err(c2pa_err)?;
+    issue_sidecar_signed(record, file_bytes, author, &signer)
+}
+
+/// Like [`issue_sidecar_with_author`], but also attaches an **RFC 3161 timestamp**
+/// obtained from `tsa_url` — the one CA-free, standardized "existence proof" (it
+/// attests the credential was signed before time T and keeps it verifiable after
+/// cert expiry; Decision 6). This makes a network call to the TSA, so it is **opt-in
+/// and native-only** — never part of the zero-telemetry default.
+#[cfg(feature = "native")]
+pub fn issue_sidecar_timestamped(
+    record: &WritingSessionRecord,
+    file_bytes: &[u8],
+    author: Option<&str>,
+    tsa_url: &str,
+) -> Result<Vec<u8>, CoreError> {
+    let inner = EphemeralSigner::new("humanshipd.local").map_err(c2pa_err)?;
+    let signer = TimestampingSigner { inner, tsa_url: tsa_url.to_string() };
+    issue_sidecar_signed(record, file_bytes, author, &signer)
+}
+
+/// Build + sign the sidecar manifest with an arbitrary [`Signer`] (the shared body
+/// behind the self-signed and timestamped issuers).
+fn issue_sidecar_signed(
+    record: &WritingSessionRecord,
+    file_bytes: &[u8],
+    author: Option<&str>,
+    signer: &dyn Signer,
+) -> Result<Vec<u8>, CoreError> {
     let mut builder = Builder::from_context(Context::new())
         .with_definition(serde_json::json!({
             "title": "Human Authored credential",
@@ -148,8 +176,37 @@ pub fn issue_sidecar_with_author(
     data_hash.set_hash(Sha256::digest(file_bytes).to_vec());
 
     builder
-        .sign_data_hashed_embeddable(&signer, &data_hash, MANIFEST_STORE_FORMAT)
+        .sign_data_hashed_embeddable(signer, &data_hash, MANIFEST_STORE_FORMAT)
         .map_err(c2pa_err)
+}
+
+/// Wraps an [`EphemeralSigner`] to request an RFC 3161 timestamp from `tsa_url`
+/// during signing (Decision 6, Part B). c2pa fetches and embeds the token when a
+/// signer's [`Signer::time_authority_url`] is set.
+#[cfg(feature = "native")]
+struct TimestampingSigner {
+    inner: EphemeralSigner,
+    tsa_url: String,
+}
+
+#[cfg(feature = "native")]
+impl Signer for TimestampingSigner {
+    fn sign(&self, data: &[u8]) -> c2pa::Result<Vec<u8>> {
+        self.inner.sign(data)
+    }
+    fn alg(&self) -> c2pa::SigningAlg {
+        self.inner.alg()
+    }
+    fn certs(&self) -> c2pa::Result<Vec<Vec<u8>>> {
+        self.inner.certs()
+    }
+    /// Extra headroom over the bare signature for the embedded RFC 3161 token.
+    fn reserve_size(&self) -> usize {
+        self.inner.reserve_size() + 10_000
+    }
+    fn time_authority_url(&self) -> Option<String> {
+        Some(self.tsa_url.clone())
+    }
 }
 
 /// Read a standalone sidecar credential and grade it against `file_bytes` (Decision

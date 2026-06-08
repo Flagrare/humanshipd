@@ -95,6 +95,7 @@ And a **browser verify page** that checks a credential entirely client-side — 
 - a **writing fingerprint** — edit position over time, where a paste is a vertical jump and a revisit dips back, with a scrubbable replay and jump-to-paste markers;
 - a **process-shape** panel — weak, positive-only corroboration of a human-like drafting rhythm (it never claims "this is AI");
 - a **self-asserted author name**, shown plainly as "not independently verified";
+- an **honest trust line** — the signature is self-signed, so it proves the document is unaltered since issuance and how it was written, *not who wrote it*, with an optional RFC 3161 timestamp (an independent "signed before this time" proof) shown when present;
 - and a one-click **Save as PDF / print** for a shareable report.
 
 The whole workspace builds on macOS, Windows, and Linux.

@@ -8,7 +8,7 @@
 //! Usage: `cargo run --example issue_credential -- <out-dir>`
 //! Writes `<out-dir>/credential.c2pa` and `<out-dir>/document.txt`.
 
-use humanshipd_core::credential::issue_sidecar_with_author;
+use humanshipd_core::credential::{issue_sidecar_timestamped, issue_sidecar_with_author};
 use humanshipd_core::session::{build_record, EditEvent, SessionInput};
 use std::{env, fs, process};
 
@@ -106,11 +106,20 @@ fn main() {
     });
 
     // A self-asserted author name (tamper-evident in the manifest, but unverified).
-    let manifest = issue_sidecar_with_author(&record, document.as_bytes(), Some("Ada Lovelace"))
-        .unwrap_or_else(|e| {
-            eprintln!("issue error: {e}");
-            process::exit(1);
-        });
+    // Opt in to an RFC 3161 timestamp by setting HUMANSHIPD_TSA to a TSA URL
+    // (e.g. http://timestamp.digicert.com) — this makes a network call.
+    let author = Some("Ada Lovelace");
+    let issued = match env::var("HUMANSHIPD_TSA") {
+        Ok(tsa) if !tsa.trim().is_empty() => {
+            eprintln!("timestamping via {tsa}");
+            issue_sidecar_timestamped(&record, document.as_bytes(), author, tsa.trim())
+        }
+        _ => issue_sidecar_with_author(&record, document.as_bytes(), author),
+    };
+    let manifest = issued.unwrap_or_else(|e| {
+        eprintln!("issue error: {e}");
+        process::exit(1);
+    });
 
     fs::create_dir_all(&out_dir).unwrap_or_else(|e| {
         eprintln!("cannot create {out_dir}: {e}");
