@@ -94,7 +94,7 @@
     </div>
 
     <script type="module">
-      import init, { verify_credential } from "./pkg/humanshipd_web_verify.js";
+      import init, { verify_credential, verify_credential_named } from "./pkg/humanshipd_web_verify.js";
 
       const button = document.getElementById("verify");
       const result = document.getElementById("result");
@@ -104,6 +104,7 @@
       await init();
       // Expose for automated tests; harmless for normal use.
       window.verify_credential = verify_credential;
+      window.verify_credential_named = verify_credential_named;
       button.disabled = false;
 
       async function bytes(input) {
@@ -455,13 +456,16 @@
       }
 
       button.addEventListener("click", async () => {
+        const docInput = document.getElementById("document");
         const credential = await bytes(document.getElementById("credential"));
-        const doc = await bytes(document.getElementById("document"));
+        const doc = await bytes(docInput);
         if (!credential || !doc) {
           alert("Pick both a credential and its document.");
           return;
         }
-        render(verify_credential(credential, doc));
+        // The filename picks the text extractor (.txt/.docx in-browser; .pdf via CLI).
+        const filename = docInput.files[0]?.name || "document.txt";
+        render(verify_credential_named(credential, doc, filename));
       });
 
       // Load the bundled example pair and verify it directly — no upload needed.

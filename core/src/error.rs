@@ -9,6 +9,8 @@ pub enum CoreError {
     Encoding(String),
     /// Cryptographic key/signature failure.
     Crypto(String),
+    /// Document text-extraction failure (unreadable or unsupported format).
+    Format(String),
 }
 
 impl fmt::Display for CoreError {
@@ -17,6 +19,7 @@ impl fmt::Display for CoreError {
             CoreError::Serialization(msg) => write!(f, "serialization error: {msg}"),
             CoreError::Encoding(msg) => write!(f, "encoding error: {msg}"),
             CoreError::Crypto(msg) => write!(f, "crypto error: {msg}"),
+            CoreError::Format(msg) => write!(f, "format error: {msg}"),
         }
     }
 }

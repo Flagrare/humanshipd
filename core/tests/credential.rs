@@ -1,10 +1,11 @@
 use humanshipd_core::canonical::sha256_hex;
 use humanshipd_core::credential::{self, Verdict};
+use humanshipd_core::formats::extract_named;
 use image::{ImageFormat, RgbaImage};
 use std::io::Cursor;
 
 mod common;
-use common::sample_record;
+use common::{minimal_docx, sample_record};
 
 fn small_png() -> Vec<u8> {
     let image = RgbaImage::new(8, 8);
@@ -107,6 +108,28 @@ fn unrelated_file_reads_as_no_match() {
     let readout = credential::read_sidecar(&manifest, unrelated).unwrap();
     assert!(matches!(readout.verdict, Verdict::NoMatch { .. }), "got {:?}", readout.verdict);
     assert!(!readout.valid);
+}
+
+#[test]
+fn a_docx_export_of_the_same_writing_verifies_cross_format() {
+    // The full Increment-2 path: a credential is sealed to the plain text, the
+    // reader drops in a .docx of the same writing, and verification extracts the
+    // OOXML text and lands on a content match — not INVALID.
+    let original = ESSAY.as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(original);
+    let manifest = credential::issue_sidecar(&record, original).unwrap();
+
+    let docx = minimal_docx(ESSAY);
+    let text = extract_named("essay.docx", &docx).expect("extract docx text");
+    let readout = credential::read_sidecar_with_text(&manifest, &docx, &text).unwrap();
+
+    assert!(
+        matches!(readout.verdict, Verdict::SameContent { .. } | Verdict::SameWriting { .. }),
+        "a .docx of the same writing should verify as a content match, got {:?}",
+        readout.verdict
+    );
+    assert!(readout.valid);
 }
 
 #[test]

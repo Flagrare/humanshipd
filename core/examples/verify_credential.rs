@@ -2,7 +2,8 @@
 //!
 //! Usage: `cargo run --example verify_credential -- <credential.c2pa> <document-file>`
 
-use humanshipd_core::credential::{read_sidecar, Verdict};
+use humanshipd_core::credential::{read_sidecar_with_text, Verdict};
+use humanshipd_core::formats::extract_named;
 use std::{env, fs, process};
 
 fn verdict_line(v: &Verdict) -> String {
@@ -36,7 +37,13 @@ fn main() {
         process::exit(2);
     });
 
-    let readout = read_sidecar(&manifest, &document).unwrap_or_else(|e| {
+    // Extract the document's text per its format (.txt/.docx/.pdf) so a non-.txt
+    // export of the same writing reaches the content-fingerprint engine.
+    let text = extract_named(&doc_path, &document).unwrap_or_else(|e| {
+        eprintln!("cannot extract text from {doc_path}: {e}");
+        process::exit(2);
+    });
+    let readout = read_sidecar_with_text(&manifest, &document, &text).unwrap_or_else(|e| {
         eprintln!("verification error: {e}");
         process::exit(1);
     });

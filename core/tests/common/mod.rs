@@ -1,4 +1,24 @@
 use humanshipd_core::record::*;
+use std::io::Write;
+
+/// Synthesize a minimal `.docx`: a zip whose only entry is `word/document.xml`
+/// wrapping `text` in one paragraph. Enough for the OOXML text extractor, which
+/// only reads `word/document.xml`.
+#[allow(dead_code)] // used by some test binaries, not all
+pub fn minimal_docx(text: &str) -> Vec<u8> {
+    let escaped = text
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
+    let xml = format!(
+        "<?xml version=\"1.0\"?><w:document xmlns:w=\"x\"><w:body><w:p><w:r><w:t>{escaped}</w:t></w:r></w:p></w:body></w:document>"
+    );
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    zip.start_file("word/document.xml", zip::write::SimpleFileOptions::default())
+        .expect("start docx entry");
+    zip.write_all(xml.as_bytes()).expect("write docx xml");
+    zip.finish().expect("finish docx").into_inner()
+}
 
 /// A representative, fully-populated record for tests.
 pub fn sample_record() -> WritingSessionRecord {

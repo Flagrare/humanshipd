@@ -13,16 +13,27 @@ sha2 = "0.10"
 hex = "0.4"
 c2pa = { version = "0.85", default-features = false }
 iscc-lib = "0.4.0"
+# `.docx` text extraction. deflate-only (pure-Rust flate2) so it compiles to WASM —
+# the in-browser verifier can read Word files. Avoids the C-backed zip codecs.
+zip = { version = "8", default-features = false, features = ["deflate"] }
+# `.pdf` text extraction — not WASM-compatible, so it's native-only (see [features]).
+pdf-extract = { version = "0.9", optional = true }
 
 [features]
 default = ["native"]
-# Native builds use OpenSSL (unchanged behavior; the test suite runs here).
-native = ["c2pa/openssl", "c2pa/default_http"]
-# WASM builds swap to c2pa's pure-Rust crypto (no OpenSSL).
+# Native builds use OpenSSL (unchanged behavior; the test suite runs here) and can
+# extract PDF text.
+native = ["c2pa/openssl", "c2pa/default_http", "dep:pdf-extract"]
+# WASM builds swap to c2pa's pure-Rust crypto (no OpenSSL) and drop the PDF path.
 wasm = ["c2pa/rust_native_crypto"]
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
-zip = "8"
-pdf-extract = "0.9"
 iscc-lib = "0.4.0"
+# Used by tests to synthesize a minimal .docx fixture (integration tests can't see
+# the library's own regular deps).
+zip = { version = "8", default-features = false, features = ["deflate"] }
+
+[[example]]
+name = "pdf_extract"
+required-features = ["native"]

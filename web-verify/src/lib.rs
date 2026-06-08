@@ -2,7 +2,8 @@
 //! same `humanshipd-core::credential::read_sidecar` logic as the CLI. The browser
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
-use humanshipd_core::credential::{read_sidecar, Verdict};
+use humanshipd_core::credential::{read_sidecar_with_text, CredentialReadout, Verdict};
+use humanshipd_core::formats::extract_named;
 use humanshipd_core::record::TimelinePoint;
 use humanshipd_core::report::{render_process_shape, render_report, ProcessShape, ProvenanceReport};
 use serde::Serialize;
@@ -57,36 +58,56 @@ struct VerifyResult {
     error: Option<String>,
 }
 
-/// Verify a credential (`.c2pa` bytes) against the document bytes it should bind to.
+/// Verify a credential (`.c2pa` bytes) against the document bytes it should bind to,
+/// treating the document as plain text. Kept for callers without a filename.
 #[wasm_bindgen]
 pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
-    let result = match read_sidecar(manifest, document) {
-        Ok(readout) => VerifyResult {
-            valid: readout.valid,
-            verdict: Some(VerdictView::from(&readout.verdict)),
-            claim: readout.claim,
-            document_sha256: readout.record.document_binding.final_text_sha256.clone(),
-            char_count: readout.record.document_binding.char_count,
-            ai_dump_flags: readout.record.evidence_flags.large_unkeyed_insertions,
-            report: Some(render_report(&readout.record)),
-            timeline: readout.record.process.timeline.clone(),
-            process_shape: Some(render_process_shape(&readout.record)),
-            author: readout.author.clone(),
-            error: None,
+    verify_credential_named(manifest, document, "document.txt")
+}
+
+/// Verify against a document whose `filename` selects the text extractor (Decision
+/// 4): `.txt`/`.docx` work in-browser; `.pdf` returns an error directing the user to
+/// the CLI. So the same writing exported as a `.docx` reaches the content engine.
+#[wasm_bindgen]
+pub fn verify_credential_named(manifest: &[u8], document: &[u8], filename: &str) -> JsValue {
+    let result = match extract_named(filename, document) {
+        Ok(text) => match read_sidecar_with_text(manifest, document, &text) {
+            Ok(readout) => success_result(readout),
+            Err(e) => error_result(e.to_string()),
         },
-        Err(e) => VerifyResult {
-            valid: false,
-            verdict: None,
-            claim: String::new(),
-            document_sha256: String::new(),
-            char_count: 0,
-            ai_dump_flags: 0,
-            report: None,
-            timeline: Vec::new(),
-            process_shape: None,
-            author: None,
-            error: Some(e.to_string()),
-        },
+        Err(e) => error_result(e.to_string()),
     };
     serde_wasm_bindgen::to_value(&result).unwrap_or(JsValue::NULL)
+}
+
+fn success_result(readout: CredentialReadout) -> VerifyResult {
+    VerifyResult {
+        valid: readout.valid,
+        verdict: Some(VerdictView::from(&readout.verdict)),
+        claim: readout.claim,
+        document_sha256: readout.record.document_binding.final_text_sha256.clone(),
+        char_count: readout.record.document_binding.char_count,
+        ai_dump_flags: readout.record.evidence_flags.large_unkeyed_insertions,
+        report: Some(render_report(&readout.record)),
+        timeline: readout.record.process.timeline.clone(),
+        process_shape: Some(render_process_shape(&readout.record)),
+        author: readout.author.clone(),
+        error: None,
+    }
+}
+
+fn error_result(message: String) -> VerifyResult {
+    VerifyResult {
+        valid: false,
+        verdict: None,
+        claim: String::new(),
+        document_sha256: String::new(),
+        char_count: 0,
+        ai_dump_flags: 0,
+        report: None,
+        timeline: Vec::new(),
+        process_shape: None,
+        author: None,
+        error: Some(message),
+    }
 }

@@ -161,6 +161,28 @@ pub fn read_sidecar(
     manifest: &[u8],
     file_bytes: &[u8],
 ) -> Result<CredentialReadout, CoreError> {
+    let text = std::str::from_utf8(file_bytes).ok();
+    read_sidecar_inner(manifest, file_bytes, text)
+}
+
+/// Verify against a document whose text was **extracted from a binary container**
+/// (e.g. a `.docx` or `.pdf` via [`crate::formats`]). The byte-exact hard binding
+/// still uses the raw `file_bytes`, but the content fingerprint is computed over
+/// `text` — so the same writing in another format lands on the content tiers
+/// instead of failing the UTF-8 check.
+pub fn read_sidecar_with_text(
+    manifest: &[u8],
+    file_bytes: &[u8],
+    text: &str,
+) -> Result<CredentialReadout, CoreError> {
+    read_sidecar_inner(manifest, file_bytes, Some(text))
+}
+
+fn read_sidecar_inner(
+    manifest: &[u8],
+    file_bytes: &[u8],
+    text: Option<&str>,
+) -> Result<CredentialReadout, CoreError> {
     let reader = Reader::from_context(Context::new())
         .with_stream(MANIFEST_STORE_FORMAT, Cursor::new(manifest.to_vec()))
         .map_err(c2pa_err)?;
@@ -178,7 +200,7 @@ pub fn read_sidecar(
     } else if record.document_binding.final_text_sha256 == sha256_hex(file_bytes) {
         Verdict::ExactFile
     } else {
-        content_verdict(manifest_obj, file_bytes)
+        content_verdict(manifest_obj, text)
     };
     Ok(readout(verdict, record, author))
 }
@@ -213,12 +235,12 @@ fn is_expected_failure(code: &str) -> bool {
 }
 
 /// Grade an authentic credential against a non-byte-exact file via the ISCC
-/// content fingerprint stored as the `c2pa.soft-binding` assertion.
-fn content_verdict(manifest: &c2pa::Manifest, file_bytes: &[u8]) -> Verdict {
+/// content fingerprint stored as the `c2pa.soft-binding` assertion. `candidate_text`
+/// is the document's extracted text (`None` ⇒ the file wasn't text and no extractor
+/// ran, so there is nothing comparable).
+fn content_verdict(manifest: &c2pa::Manifest, candidate_text: Option<&str>) -> Verdict {
     let stored = manifest.find_assertion::<SoftBinding>("c2pa.soft-binding").ok();
-    let candidate = std::str::from_utf8(file_bytes)
-        .ok()
-        .and_then(|text| fingerprint::text_iscc(text).ok());
+    let candidate = candidate_text.and_then(|text| fingerprint::text_iscc(text).ok());
     let distance = match (stored, candidate) {
         (Some(sb), Some(code)) => fingerprint::iscc_distance(&sb.value, &code),
         _ => None,
