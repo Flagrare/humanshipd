@@ -1044,7 +1044,7 @@ dependencies = [
 
 [[package]]
 name = "humanshipd-core"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "c2pa",
  "hex",
@@ -1057,7 +1057,7 @@ dependencies = [
 
 [[package]]
 name = "humanshipd-web-verify"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "humanshipd-core",
  "serde",

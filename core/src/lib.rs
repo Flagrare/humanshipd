@@ -17,7 +17,7 @@ pub mod text_embed;
 
 pub use credential::{
     issue_ephemeral, issue_sidecar, issue_sidecar_with_author, read, read_sidecar,
-    CredentialReadout, AUTHOR_ASSERTION, PROCESS_ASSERTION,
+    CredentialReadout, Verdict, AUTHOR_ASSERTION, PROCESS_ASSERTION,
 };
 pub use error::CoreError;
 pub use record::{
@@ -29,7 +29,10 @@ pub use report::{
     render_process_shape, render_report, NuanceSummary, ProcessAssessment, ProcessShape,
     ProvenanceReport, ReportBand,
 };
-pub use fingerprint::{text_iscc, text_soft_binding, SoftBinding, ISCC_ALG};
+pub use fingerprint::{
+    classify, iscc_distance, text_iscc, text_soft_binding, Band, SoftBinding,
+    BAND_BORDERLINE_MAX, BAND_SAME_CONTENT_MAX, BAND_SAME_WRITING_MAX, ISCC_ALG,
+};
 pub use gdocs::session_from_changelog;
 pub use session::{build_record, EditEvent, SessionInput, LARGE_UNKEYED_THRESHOLD};
 pub use text_embed::{embed, extract, strip};

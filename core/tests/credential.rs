@@ -1,5 +1,5 @@
 use humanshipd_core::canonical::sha256_hex;
-use humanshipd_core::credential;
+use humanshipd_core::credential::{self, Verdict};
 use image::{ImageFormat, RgbaImage};
 use std::io::Cursor;
 
@@ -55,6 +55,58 @@ fn sidecar_credential_rejects_a_different_file() {
         Ok(readout) => assert!(!readout.valid, "different file must not validate"),
         Err(_) => { /* c2pa rejecting the data-hash mismatch outright is also fine */ }
     }
+}
+
+const ESSAY: &str = "Provenance beats inference. Rather than guessing whether a \
+    passage was written by a machine, we record the process by which it was written \
+    and bind a verifiable credential to the result. The credential attests how the \
+    text came to be, not who originated the ideas behind it.";
+
+#[test]
+fn exact_same_file_reads_as_the_exact_file_tier() {
+    let file = ESSAY.as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(file);
+    let manifest = credential::issue_sidecar(&record, file).unwrap();
+
+    let readout = credential::read_sidecar(&manifest, file).unwrap();
+    assert!(matches!(readout.verdict, Verdict::ExactFile), "got {:?}", readout.verdict);
+    assert!(readout.valid);
+}
+
+#[test]
+fn reformatted_file_reads_as_a_content_match_not_invalid() {
+    // The headline Decision-4 behaviour: the same writing, re-exported with
+    // format whitespace noise, must read as a *content* match rather than INVALID.
+    let original = ESSAY.as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(original);
+    let manifest = credential::issue_sidecar(&record, original).unwrap();
+
+    let reformatted = ESSAY.replace(' ', "  ").replace(". ", " .\n");
+    let readout = credential::read_sidecar(&manifest, reformatted.as_bytes()).unwrap();
+
+    assert!(
+        matches!(readout.verdict, Verdict::SameContent { .. } | Verdict::SameWriting { .. }),
+        "reformatted export should be a content match, got {:?}",
+        readout.verdict
+    );
+    assert!(readout.valid, "a same-writing match is a valid credential");
+}
+
+#[test]
+fn unrelated_file_reads_as_no_match() {
+    let original = ESSAY.as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(original);
+    let manifest = credential::issue_sidecar(&record, original).unwrap();
+
+    let unrelated = "Tide charts and coral spawning cycles govern when the reef \
+        releases its gametes across the atoll each year."
+        .as_bytes();
+    let readout = credential::read_sidecar(&manifest, unrelated).unwrap();
+    assert!(matches!(readout.verdict, Verdict::NoMatch { .. }), "got {:?}", readout.verdict);
+    assert!(!readout.valid);
 }
 
 #[test]

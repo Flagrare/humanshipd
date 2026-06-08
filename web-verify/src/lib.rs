@@ -2,15 +2,45 @@
 //! same `humanshipd-core::credential::read_sidecar` logic as the CLI. The browser
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
-use humanshipd_core::credential::read_sidecar;
+use humanshipd_core::credential::{read_sidecar, Verdict};
 use humanshipd_core::record::TimelinePoint;
 use humanshipd_core::report::{render_process_shape, render_report, ProcessShape, ProvenanceReport};
 use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
+/// Serializable view of the tiered [`Verdict`] for the page (Decision 4).
+#[derive(Serialize)]
+struct VerdictView {
+    /// One of: exact_file | same_content | same_writing | borderline | no_match | invalid.
+    tier: &'static str,
+    /// Normalized Hamming content distance (0.0–1.0), when a content comparison was made.
+    distance: Option<f64>,
+}
+
+impl From<&Verdict> for VerdictView {
+    fn from(v: &Verdict) -> Self {
+        match v {
+            Verdict::Invalid => VerdictView { tier: "invalid", distance: None },
+            Verdict::ExactFile => VerdictView { tier: "exact_file", distance: None },
+            Verdict::SameContent { distance } => {
+                VerdictView { tier: "same_content", distance: Some(*distance) }
+            }
+            Verdict::SameWriting { distance } => {
+                VerdictView { tier: "same_writing", distance: Some(*distance) }
+            }
+            Verdict::Borderline { distance } => {
+                VerdictView { tier: "borderline", distance: Some(*distance) }
+            }
+            Verdict::NoMatch { distance } => VerdictView { tier: "no_match", distance: *distance },
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct VerifyResult {
     valid: bool,
+    /// The tiered match verdict; absent only when the credential couldn't be read.
+    verdict: Option<VerdictView>,
     claim: String,
     document_sha256: String,
     char_count: u64,
@@ -33,6 +63,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
     let result = match read_sidecar(manifest, document) {
         Ok(readout) => VerifyResult {
             valid: readout.valid,
+            verdict: Some(VerdictView::from(&readout.verdict)),
             claim: readout.claim,
             document_sha256: readout.record.document_binding.final_text_sha256.clone(),
             char_count: readout.record.document_binding.char_count,
@@ -45,6 +76,7 @@ pub fn verify_credential(manifest: &[u8], document: &[u8]) -> JsValue {
         },
         Err(e) => VerifyResult {
             valid: false,
+            verdict: None,
             claim: String::new(),
             document_sha256: String::new(),
             char_count: 0,

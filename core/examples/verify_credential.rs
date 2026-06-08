@@ -2,8 +2,23 @@
 //!
 //! Usage: `cargo run --example verify_credential -- <credential.c2pa> <document-file>`
 
-use humanshipd_core::credential::read_sidecar;
+use humanshipd_core::credential::{read_sidecar, Verdict};
 use std::{env, fs, process};
+
+fn verdict_line(v: &Verdict) -> String {
+    let pct = |d: f64| format!("{:.0}%", d * 100.0);
+    match v {
+        Verdict::Invalid => "invalid (broken or forged signature)".to_string(),
+        Verdict::ExactFile => "exact file (byte-exact hard binding)".to_string(),
+        Verdict::SameContent { distance } => format!("same content — distance {}", pct(*distance)),
+        Verdict::SameWriting { distance } => format!("same writing — distance {}", pct(*distance)),
+        Verdict::Borderline { distance } => format!("borderline — distance {}", pct(*distance)),
+        Verdict::NoMatch { distance } => match distance {
+            Some(d) => format!("no match — distance {}", pct(*d)),
+            None => "no match (no comparable content fingerprint)".to_string(),
+        },
+    }
+}
 
 fn main() {
     let mut args = env::args().skip(1);
@@ -26,6 +41,7 @@ fn main() {
         process::exit(1);
     });
 
+    println!("verdict       : {}", verdict_line(&readout.verdict));
     println!("valid         : {}", readout.valid);
     println!(
         "doc sha256    : {}",

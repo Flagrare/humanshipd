@@ -10,6 +10,9 @@
 
 use crate::canonical::sha256_hex;
 use crate::error::CoreError;
+use crate::fingerprint::{
+    self, Band, SoftBinding, BAND_BORDERLINE_MAX, BAND_SAME_CONTENT_MAX, BAND_SAME_WRITING_MAX,
+};
 use crate::record::WritingSessionRecord;
 use c2pa::assertions::DataHash;
 use c2pa::{Builder, Context, EphemeralSigner, Reader, Signer, ValidationState};
@@ -149,33 +152,86 @@ pub fn issue_sidecar_with_author(
         .map_err(c2pa_err)
 }
 
-/// Read a standalone sidecar credential and re-bind it to `file_bytes`: validates
-/// the C2PA signature, extracts the process record, and confirms the bound hash
-/// matches `sha256(file_bytes)`.
+/// Read a standalone sidecar credential and grade it against `file_bytes` (Decision
+/// 4). The manifest is read **standalone**, so signature authenticity is judged
+/// independently of which file is presented; the file binding is then computed here
+/// — byte-exact (SHA-256) first, falling back to the ISCC content fingerprint — and
+/// returned as a tiered [`Verdict`].
 pub fn read_sidecar(
     manifest: &[u8],
     file_bytes: &[u8],
 ) -> Result<CredentialReadout, CoreError> {
     let reader = Reader::from_context(Context::new())
-        .with_manifest_data_and_stream(
-            manifest,
-            MANIFEST_STORE_FORMAT,
-            Cursor::new(file_bytes.to_vec()),
-        )
+        .with_stream(MANIFEST_STORE_FORMAT, Cursor::new(manifest.to_vec()))
         .map_err(c2pa_err)?;
-    let signature_ok = matches!(
-        reader.validation_state(),
-        ValidationState::Valid | ValidationState::Trusted
-    );
+    let authentic = signature_authentic(&reader);
     let manifest_obj = reader
         .active_manifest()
         .ok_or_else(|| CoreError::Crypto("no active manifest".to_string()))?;
     let record = manifest_obj
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
-    let hash_ok = record.document_binding.final_text_sha256 == sha256_hex(file_bytes);
     let author = self_asserted_author(manifest_obj);
-    Ok(readout(signature_ok && hash_ok, record, author))
+
+    let verdict = if !authentic {
+        Verdict::Invalid
+    } else if record.document_binding.final_text_sha256 == sha256_hex(file_bytes) {
+        Verdict::ExactFile
+    } else {
+        content_verdict(manifest_obj, file_bytes)
+    };
+    Ok(readout(verdict, record, author))
+}
+
+/// Is the credential's own signature genuine, regardless of which file we checked
+/// against? True when the COSE claim signature validated and the only validation
+/// failures are *expected* for our model — see [`is_expected_failure`].
+fn signature_authentic(reader: &Reader) -> bool {
+    let Some(codes) = reader.validation_results().and_then(|r| r.active_manifest()) else {
+        return false;
+    };
+    let signed = codes
+        .success()
+        .iter()
+        .any(|s| s.code() == "claimSignature.validated");
+    let fatal = codes
+        .failure()
+        .iter()
+        .any(|s| !is_expected_failure(s.code()));
+    signed && !fatal
+}
+
+/// Failure codes that don't impugn authenticity. A self-signed local credential is
+/// `untrusted` by design (Decision 6); `assertion.dataHash.mismatch` is expected
+/// because we read the manifest standalone and bind the file ourselves; an untrusted
+/// timestamp is likewise expected without a trusted TSA.
+fn is_expected_failure(code: &str) -> bool {
+    matches!(
+        code,
+        "signingCredential.untrusted" | "assertion.dataHash.mismatch" | "timeStamp.untrusted"
+    )
+}
+
+/// Grade an authentic credential against a non-byte-exact file via the ISCC
+/// content fingerprint stored as the `c2pa.soft-binding` assertion.
+fn content_verdict(manifest: &c2pa::Manifest, file_bytes: &[u8]) -> Verdict {
+    let stored = manifest.find_assertion::<SoftBinding>("c2pa.soft-binding").ok();
+    let candidate = std::str::from_utf8(file_bytes)
+        .ok()
+        .and_then(|text| fingerprint::text_iscc(text).ok());
+    let distance = match (stored, candidate) {
+        (Some(sb), Some(code)) => fingerprint::iscc_distance(&sb.value, &code),
+        _ => None,
+    };
+    match distance {
+        Some(d) => match fingerprint::classify(d) {
+            Band::SameContent => Verdict::SameContent { distance: d },
+            Band::SameWriting => Verdict::SameWriting { distance: d },
+            Band::Borderline => Verdict::Borderline { distance: d },
+            Band::NoMatch => Verdict::NoMatch { distance: Some(d) },
+        },
+        None => Verdict::NoMatch { distance: None },
+    }
 }
 
 /// Extract the self-asserted author name, if the manifest carries one.
@@ -186,10 +242,46 @@ fn self_asserted_author(manifest: &c2pa::Manifest) -> Option<String> {
         .map(|a| a.name)
 }
 
+/// The tiered verification verdict (Decision 4). A credential is either forged
+/// (`Invalid`) or genuine — in which case the file binding grades from a byte-exact
+/// match down to no match via the ISCC content fingerprint.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Verdict {
+    /// The credential's own signature failed — altered or forged. (Says nothing
+    /// about the file; the credential itself is not trustworthy.)
+    Invalid,
+    /// Authentic, and the byte-exact SHA-256 hard binding matches this file.
+    ExactFile,
+    /// Authentic; content fingerprint within the same-content band (reformatted,
+    /// format-converted, or lightly edited).
+    SameContent { distance: f64 },
+    /// Authentic; same writing, heavily edited across revisions.
+    SameWriting { distance: f64 },
+    /// Authentic, but the file sits in the borderline band — needs human review.
+    Borderline { distance: f64 },
+    /// Authentic credential, but this file is not the writing it covers (beyond the
+    /// threshold, or no comparable content fingerprint).
+    NoMatch { distance: Option<f64> },
+}
+
+impl Verdict {
+    /// Whether this file is the writing the credential covers — exactly, reformatted,
+    /// or edited. Borderline/NoMatch/Invalid are not matches.
+    pub fn is_match(&self) -> bool {
+        matches!(
+            self,
+            Verdict::ExactFile | Verdict::SameContent { .. } | Verdict::SameWriting { .. }
+        )
+    }
+}
+
 /// Verification outcome from reading a signed manifest.
 pub struct CredentialReadout {
-    /// True if the C2PA signature + bindings validate (Valid or Trusted).
+    /// True if the credential is authentic **and** this file is the writing it
+    /// covers (exact, reformatted, or edited). Convenience over [`Self::verdict`].
     pub valid: bool,
+    /// The full tiered verdict (Decision 4).
+    pub verdict: Verdict,
     pub record: WritingSessionRecord,
     /// Honest, non-overclaiming human-readable claim.
     pub claim: String,
@@ -198,40 +290,81 @@ pub struct CredentialReadout {
     pub author: Option<String>,
 }
 
-fn readout(valid: bool, record: WritingSessionRecord, author: Option<String>) -> CredentialReadout {
-    let claim = render_claim(valid, record.evidence_flags.large_unkeyed_insertions);
+fn readout(
+    verdict: Verdict,
+    record: WritingSessionRecord,
+    author: Option<String>,
+) -> CredentialReadout {
+    let claim = render_claim(&verdict, record.evidence_flags.large_unkeyed_insertions);
     CredentialReadout {
-        valid,
+        valid: verdict.is_match(),
+        verdict,
         record,
         claim,
         author,
     }
 }
 
-/// Render the honest claim. Never asserts a human originated the ideas.
-fn render_claim(valid: bool, large_unkeyed_insertions: u64) -> String {
-    if !valid {
-        return "INVALID — this credential failed verification (altered, or the document does not match).".to_string();
-    }
-    let mut parts = vec![
-        "Verified C2PA credential: signed and unaltered since issuance, bound to this exact document.".to_string(),
-    ];
-    if large_unkeyed_insertions > 0 {
-        let (n, noun) = (
-            large_unkeyed_insertions,
-            if large_unkeyed_insertions == 1 { "insertion" } else { "insertions" },
-        );
-        parts.push(format!(
-            "WARNING: {n} large {noun} appeared without typing — possible paste of AI-generated text."
-        ));
-    } else {
-        parts.push(
-            "The writing showed an incremental, human-like process with no large un-keyed insertions."
+/// Render the honest claim for a verdict. Never asserts a human originated the ideas.
+fn render_claim(verdict: &Verdict, large_unkeyed_insertions: u64) -> String {
+    let pct = |d: f64| format!("{:.0}%", d * 100.0);
+    let process = process_note(large_unkeyed_insertions);
+    match verdict {
+        Verdict::Invalid => "INVALID — this credential failed verification: its signature is \
+            broken or forged, so nothing it claims can be trusted."
+            .to_string(),
+        Verdict::ExactFile => {
+            format!("Verified: signed and unaltered, bound to this exact file. {process}")
+        }
+        Verdict::SameContent { distance } => format!(
+            "Verified credential for this writing — same content, reformatted or lightly edited \
+             (content distance {}, within the {} same-content threshold). {process}",
+            pct(*distance),
+            pct(BAND_SAME_CONTENT_MAX)
+        ),
+        Verdict::SameWriting { distance } => format!(
+            "Verified credential for this writing — an edited version of the credentialed text \
+             (content distance {}, within the {} same-writing threshold). {process}",
+            pct(*distance),
+            pct(BAND_SAME_WRITING_MAX)
+        ),
+        Verdict::Borderline { distance } => format!(
+            "BORDERLINE — this file sits near the edge of the match threshold (content distance \
+             {}, just past the {} same-writing line). A human should judge whether it is the \
+             same writing.",
+            pct(*distance),
+            pct(BAND_SAME_WRITING_MAX)
+        ),
+        Verdict::NoMatch { distance } => match distance {
+            Some(d) => format!(
+                "NO MATCH — this file is not the writing this credential covers (content distance \
+                 {}, beyond the {} threshold).",
+                pct(*d),
+                pct(BAND_BORDERLINE_MAX)
+            ),
+            None => "NO MATCH — this file is not the writing this credential covers, and no \
+                content fingerprint could be compared."
                 .to_string(),
-        );
+        },
     }
-    parts.push("This attests process integrity, not that a human originated the ideas.".to_string());
-    parts.join(" ")
+}
+
+/// The process-integrity sentence shared by the matching tiers.
+fn process_note(large_unkeyed_insertions: u64) -> String {
+    let tail = "This attests process integrity, not that a human originated the ideas.";
+    if large_unkeyed_insertions > 0 {
+        let noun = if large_unkeyed_insertions == 1 {
+            "insertion"
+        } else {
+            "insertions"
+        };
+        format!(
+            "WARNING: {large_unkeyed_insertions} large {noun} appeared without typing — possible \
+             paste of AI-generated text. {tail}"
+        )
+    } else {
+        format!("The writing showed an incremental, human-like process with no large un-keyed insertions. {tail}")
+    }
 }
 
 /// Read + validate a signed asset, returning the embedded process record.
@@ -250,5 +383,8 @@ pub fn read(asset_format: &str, signed_asset: &[u8]) -> Result<CredentialReadout
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
     let author = self_asserted_author(manifest);
-    Ok(readout(valid, record, author))
+    // Embedded assets are covered byte-for-byte by the C2PA data hash, so a valid
+    // state is an exact-file match; otherwise the manifest itself failed.
+    let verdict = if valid { Verdict::ExactFile } else { Verdict::Invalid };
+    Ok(readout(verdict, record, author))
 }

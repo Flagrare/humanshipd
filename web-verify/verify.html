@@ -14,6 +14,7 @@
       #result { margin-top: 22px; padding: 16px; border-radius: 8px; display: none; }
       #result.valid { background: #e6f4ea; border: 1px solid #137333; }
       #result.invalid { background: #fce8e6; border: 1px solid #b3261e; }
+      #result.borderline { background: #fef7e0; border: 1px solid #b06000; }
       .verdict { font-weight: 700; font-size: 16px; }
       .claim { margin-top: 8px; }
       .author { margin-top: 10px; font-size: 14px; }
@@ -126,14 +127,35 @@
         unverified: "Unverified — substantial content was not captured",
       };
 
+      // Decision 4: the verdict is a tier, not a yes/no. Each tier maps to a short
+      // header label and a result colour (green = a match, amber = borderline,
+      // red = no match / forged). The full honest sentence lives in `out.claim`.
+      const TIER = {
+        exact_file:   { label: "✓ Verified — exact file",            state: "valid" },
+        same_content: { label: "✓ Verified — same content (reformatted)", state: "valid" },
+        same_writing: { label: "✓ Verified — same writing (edited)",  state: "valid" },
+        borderline:   { label: "⚠ Borderline — needs review",        state: "borderline" },
+        no_match:     { label: "✗ No match for this file",            state: "invalid" },
+        invalid:      { label: "✗ Not valid — broken or forged",      state: "invalid" },
+      };
+
       function render(out) {
         result.style.display = "block";
-        result.className = out.valid ? "valid" : "invalid";
-        document.getElementById("verdict").textContent = out.error
+        const tier = out.verdict && TIER[out.verdict.tier];
+        const state = out.error ? "invalid" : tier ? tier.state : out.valid ? "valid" : "invalid";
+        result.className = state;
+        let verdictText = out.error
           ? `Could not read credential: ${out.error}`
+          : tier
+          ? tier.label
           : out.valid
           ? "✓ Verified"
           : "✗ Not valid";
+        // Surface the measured content distance when one was computed.
+        if (!out.error && out.verdict && out.verdict.distance != null) {
+          verdictText += `  (content distance ${Math.round(out.verdict.distance * 100)}%)`;
+        }
+        document.getElementById("verdict").textContent = verdictText;
         document.getElementById("claim").textContent = out.claim || "";
 
         // Build details with textContent (never innerHTML): the values come from a
