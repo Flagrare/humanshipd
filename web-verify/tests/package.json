@@ -1,0 +1,7 @@
+{
+  "name": "humanshipd-web-verify-tests",
+  "private": true,
+  "description": "Playwright regression for the in-browser credential verifier (verify.html).",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "^1.49.0" }
+}
