@@ -17,6 +17,8 @@
       #result.borderline { background: #fef7e0; border: 1px solid #b06000; }
       .verdict { font-weight: 700; font-size: 16px; }
       .claim { margin-top: 8px; }
+      .trust { margin-top: 8px; font-size: 13px; color: #555; }
+      .trust .label { font-weight: 600; }
       .author { margin-top: 10px; font-size: 14px; }
       .author .name { font-weight: 600; }
       .author .unverified { color: #777; font-size: 12px; }
@@ -85,6 +87,7 @@
     <div id="result">
       <div class="verdict" id="verdict"></div>
       <div class="claim" id="claim"></div>
+      <div class="trust" id="trust" style="display: none"></div>
       <div class="author" id="author" style="display: none"></div>
       <dl id="details"></dl>
       <div class="report" id="report"></div>
@@ -166,15 +169,39 @@
         const fingerprint = document.getElementById("fingerprint");
         const shape = document.getElementById("shape");
         const author = document.getElementById("author");
+        const trust = document.getElementById("trust");
         details.replaceChildren();
         report.replaceChildren();
         fingerprint.replaceChildren();
         shape.replaceChildren();
         author.replaceChildren();
+        trust.replaceChildren();
         shape.style.display = "none";
         author.style.display = "none";
+        trust.style.display = "none";
         printButton.style.display = out.valid ? "inline-block" : "none";
         if (out.error) return;
+
+        // Honest trust framing (Decision 6): what the signature does and doesn't
+        // prove. Shown whenever the credential is authentic, even on a no-match.
+        if (out.trust && out.trust.signed) {
+          trust.style.display = "block";
+          const label = document.createElement("span");
+          label.className = "label";
+          label.textContent = out.trust.trusted
+            ? "Signature: trusted. "
+            : "Signature: self-signed (not independently trusted). ";
+          const detail = document.createElement("span");
+          detail.textContent = out.trust.identity_verified
+            ? "Proves the document is unaltered since issuance; the signer's identity is verified."
+            : "Proves the document is unaltered since issuance and how it was written — not who wrote it.";
+          trust.append(label, detail);
+          if (out.trust.timestamp) {
+            const ts = document.createElement("span");
+            ts.textContent = ` Timestamped ${out.trust.timestamp} (independent existence proof).`;
+            trust.append(ts);
+          }
+        }
 
         // Self-asserted author — shown only when valid, always labeled unverified.
         if (out.valid && out.author) {

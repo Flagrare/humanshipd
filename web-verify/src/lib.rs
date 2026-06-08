@@ -2,7 +2,7 @@
 //! same `humanshipd-core::credential::read_sidecar` logic as the CLI. The browser
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
-use humanshipd_core::credential::{read_sidecar_with_text, CredentialReadout, Verdict};
+use humanshipd_core::credential::{read_sidecar_with_text, CredentialReadout, TrustStatus, Verdict};
 use humanshipd_core::formats::extract_named;
 use humanshipd_core::record::TimelinePoint;
 use humanshipd_core::report::{render_process_shape, render_report, ProcessShape, ProvenanceReport};
@@ -37,11 +37,33 @@ impl From<&Verdict> for VerdictView {
     }
 }
 
+/// Serializable view of [`TrustStatus`] for the page (Decision 6).
+#[derive(Serialize)]
+struct TrustView {
+    signed: bool,
+    trusted: bool,
+    identity_verified: bool,
+    timestamp: Option<String>,
+}
+
+impl From<&TrustStatus> for TrustView {
+    fn from(t: &TrustStatus) -> Self {
+        TrustView {
+            signed: t.signed,
+            trusted: t.trusted,
+            identity_verified: t.identity_verified,
+            timestamp: t.timestamp.clone(),
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct VerifyResult {
     valid: bool,
     /// The tiered match verdict; absent only when the credential couldn't be read.
     verdict: Option<VerdictView>,
+    /// What the signature establishes — and what it doesn't (Decision 6).
+    trust: Option<TrustView>,
     claim: String,
     document_sha256: String,
     char_count: u64,
@@ -84,6 +106,7 @@ fn success_result(readout: CredentialReadout) -> VerifyResult {
     VerifyResult {
         valid: readout.valid,
         verdict: Some(VerdictView::from(&readout.verdict)),
+        trust: Some(TrustView::from(&readout.trust)),
         claim: readout.claim,
         document_sha256: readout.record.document_binding.final_text_sha256.clone(),
         char_count: readout.record.document_binding.char_count,
@@ -100,6 +123,7 @@ fn error_result(message: String) -> VerifyResult {
     VerifyResult {
         valid: false,
         verdict: None,
+        trust: None,
         claim: String::new(),
         document_sha256: String::new(),
         char_count: 0,

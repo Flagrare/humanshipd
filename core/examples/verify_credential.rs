@@ -49,6 +49,11 @@ fn main() {
     });
 
     println!("verdict       : {}", verdict_line(&readout.verdict));
+    let t = &readout.trust;
+    let trust = if t.trusted { "trusted" } else { "self-signed (untrusted)" };
+    let identity = if t.identity_verified { "verified" } else { "unverified" };
+    let stamp = t.timestamp.as_deref().unwrap_or("none");
+    println!("trust         : signed={} {trust}; identity {identity}; timestamp {stamp}", t.signed);
     println!("valid         : {}", readout.valid);
     println!(
         "doc sha256    : {}",

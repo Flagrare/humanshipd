@@ -111,6 +111,23 @@ fn unrelated_file_reads_as_no_match() {
 }
 
 #[test]
+fn a_self_signed_credential_is_authentic_but_untrusted_and_identity_unverified() {
+    // Decision 6: the local default must report honestly — the signature is valid
+    // (authentic, tamper-evident) but the signer is neither trust-listed nor
+    // identity-verified, and there's no timestamp unless one was requested.
+    let file = ESSAY.as_bytes();
+    let mut record = sample_record();
+    record.document_binding.final_text_sha256 = sha256_hex(file);
+    let manifest = credential::issue_sidecar(&record, file).unwrap();
+
+    let trust = credential::read_sidecar(&manifest, file).unwrap().trust;
+    assert!(trust.signed, "self-signed credential is still authentically signed");
+    assert!(!trust.trusted, "self-signed must not claim trust-list trust");
+    assert!(!trust.identity_verified, "no identity is verified by a local tool");
+    assert!(trust.timestamp.is_none(), "no RFC 3161 timestamp without an opt-in TSA");
+}
+
+#[test]
 fn a_docx_export_of_the_same_writing_verifies_cross_format() {
     // The full Increment-2 path: a credential is sealed to the plain text, the
     // reader drops in a .docx of the same writing, and verification extracts the

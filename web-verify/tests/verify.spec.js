@@ -90,6 +90,9 @@ test("the bundled demo reads as an exact-file match", async ({ page }) => {
   await page.getByRole("button", { name: "Load a demo credential" }).click();
   await expect(page.locator("#verdict")).toContainText("exact file");
   await expect(page.locator("#result")).toHaveClass(/valid/);
+  // Decision 6: the trust framing must be honest about the self-signed default.
+  await expect(page.locator("#trust")).toContainText("self-signed");
+  await expect(page.locator("#trust")).toContainText("not who wrote it");
 });
 
 test("a .docx of the same writing verifies as a content match", async ({ page }) => {

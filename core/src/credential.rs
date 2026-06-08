@@ -194,6 +194,7 @@ fn read_sidecar_inner(
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
     let author = self_asserted_author(manifest_obj);
+    let trust = trust_status(&reader, manifest_obj);
 
     let verdict = if !authentic {
         Verdict::Invalid
@@ -202,7 +203,7 @@ fn read_sidecar_inner(
     } else {
         content_verdict(manifest_obj, text)
     };
-    Ok(readout(verdict, record, author))
+    Ok(readout(verdict, trust, record, author))
 }
 
 /// Is the credential's own signature genuine, regardless of which file we checked
@@ -297,6 +298,24 @@ impl Verdict {
     }
 }
 
+/// What the signature does and does not establish (Decision 6). A local-only tool
+/// produces a *valid* (tamper-evident) but *untrusted* (no CA on a trust list) and
+/// *identity-unverified* credential — this carries that honestly to the verifier.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TrustStatus {
+    /// The COSE claim signature validated — the credential is authentic and the
+    /// content is unaltered since issuance.
+    pub signed: bool,
+    /// The signing certificate chains to a CA on the validator's trust list. For
+    /// the self-signed local default this is **false** by design (Decision 6).
+    pub trusted: bool,
+    /// The signer's real-world identity has been independently verified. Always
+    /// **false** today; the slot is reserved for an opt-in CAWG identity assertion.
+    pub identity_verified: bool,
+    /// RFC 3161 attested signing time, if the credential was timestamped (Part B).
+    pub timestamp: Option<String>,
+}
+
 /// Verification outcome from reading a signed manifest.
 pub struct CredentialReadout {
     /// True if the credential is authentic **and** this file is the writing it
@@ -304,6 +323,8 @@ pub struct CredentialReadout {
     pub valid: bool,
     /// The full tiered verdict (Decision 4).
     pub verdict: Verdict,
+    /// What the signature establishes — and what it deliberately doesn't (Decision 6).
+    pub trust: TrustStatus,
     pub record: WritingSessionRecord,
     /// Honest, non-overclaiming human-readable claim.
     pub claim: String,
@@ -312,8 +333,25 @@ pub struct CredentialReadout {
     pub author: Option<String>,
 }
 
+/// Read the honest trust status from a parsed manifest + its validation results.
+fn trust_status(reader: &Reader, manifest: &c2pa::Manifest) -> TrustStatus {
+    let codes = reader.validation_results().and_then(|r| r.active_manifest());
+    let has = |code: &str| {
+        codes.is_some_and(|c| c.success().iter().any(|s| s.code() == code))
+    };
+    TrustStatus {
+        signed: has("claimSignature.validated"),
+        trusted: has("signingCredential.trusted"),
+        // No verified identity assertion is consumed yet — the self-asserted author
+        // name is explicitly unverified. Flips on when a CAWG identity assertion lands.
+        identity_verified: false,
+        timestamp: manifest.time(),
+    }
+}
+
 fn readout(
     verdict: Verdict,
+    trust: TrustStatus,
     record: WritingSessionRecord,
     author: Option<String>,
 ) -> CredentialReadout {
@@ -321,6 +359,7 @@ fn readout(
     CredentialReadout {
         valid: verdict.is_match(),
         verdict,
+        trust,
         record,
         claim,
         author,
@@ -405,8 +444,9 @@ pub fn read(asset_format: &str, signed_asset: &[u8]) -> Result<CredentialReadout
         .find_assertion::<WritingSessionRecord>(PROCESS_ASSERTION)
         .map_err(c2pa_err)?;
     let author = self_asserted_author(manifest);
+    let trust = trust_status(&reader, manifest);
     // Embedded assets are covered byte-for-byte by the C2PA data hash, so a valid
     // state is an exact-file match; otherwise the manifest itself failed.
     let verdict = if valid { Verdict::ExactFile } else { Verdict::Invalid };
-    Ok(readout(verdict, record, author))
+    Ok(readout(verdict, trust, record, author))
 }
