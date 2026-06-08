@@ -1,10 +1,14 @@
+// Each integration-test binary compiles this module independently and uses only a
+// subset of the helpers, so unused-here items are expected (and clippy runs with
+// `-D warnings` in CI).
+#![allow(dead_code)]
+
 use humanshipd_core::record::*;
 use std::io::Write;
 
 /// Synthesize a minimal `.docx`: a zip whose only entry is `word/document.xml`
 /// wrapping `text` in one paragraph. Enough for the OOXML text extractor, which
 /// only reads `word/document.xml`.
-#[allow(dead_code)] // used by some test binaries, not all
 pub fn minimal_docx(text: &str) -> Vec<u8> {
     let escaped = text
         .replace('&', "&amp;")
