@@ -146,7 +146,7 @@
         const state = out.error ? "invalid" : tier ? tier.state : out.valid ? "valid" : "invalid";
         result.className = state;
         let verdictText = out.error
-          ? `Could not read credential: ${out.error}`
+          ? `Could not verify: ${out.error}`
           : tier
           ? tier.label
           : out.valid
