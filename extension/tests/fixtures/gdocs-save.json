@@ -1,0 +1,8 @@
+{
+  "_comment": "Real Google Docs /save request bodies captured live on 2026-06-09 (form-encoded `rev` + `bundles=[{commands:[{ty:is,ibi,s}]}]`). Replaying these two ops in order reconstructs the expected text. Used by gdocs.spec.js to guard the inject's body parser + replay against the real format.",
+  "bodies": [
+    "rev=1&bundles=%5B%7B%22commands%22%3A%5B%7B%22ty%22%3A%22is%22%2C%22ibi%22%3A1%2C%22s%22%3A%22Pr%22%7D%5D%2C%22sid%22%3A%222732064ff6571076%22%2C%22reqId%22%3A0%7D%5D",
+    "rev=2&bundles=%5B%7B%22commands%22%3A%5B%7B%22ty%22%3A%22is%22%2C%22ibi%22%3A3%2C%22s%22%3A%22%20The%20reef%20spawns%20at%20the%20full%20moon.%22%7D%5D%2C%22sid%22%3A%222732064ff6571076%22%2C%22reqId%22%3A1%7D%5D"
+  ],
+  "expected_text": "Pr The reef spawns at the full moon."
+}

@@ -104,16 +104,19 @@ test("the inject extracts ops from a /save body and feeds the session", async ({
   expect(s.final_text).toBe("From save body");
 });
 
-// Drop a captured real save into fixtures/gdocs-save.json as { body, expected_text }
-// to turn this into a real-data regression (and a parity check vs. the Rust parser).
+// Real Google Docs /save bodies captured live (fixtures/gdocs-save.json): replaying
+// them through the actual inject + replay must reconstruct the expected text. Guards
+// the parser against drift in Docs' real save format.
 const SAMPLE = path.join(__dirname, "fixtures", "gdocs-save.json");
-test("matches the expected text on a real /save sample", async ({ page }) => {
+test("reconstructs the expected text from real /save bodies", async ({ page }) => {
   test.skip(!fs.existsSync(SAMPLE), "no fixtures/gdocs-save.json — see comment");
-  const { body, expected_text } = JSON.parse(fs.readFileSync(SAMPLE, "utf8"));
+  const { bodies, expected_text } = JSON.parse(fs.readFileSync(SAMPLE, "utf8"));
   await boot(page, { withInject: true });
-  await page.evaluate(async (b) => {
-    await window.fetch("https://docs.google.com/save", { method: "POST", body: b });
-  }, body);
+  await page.evaluate(async (bs) => {
+    for (const b of bs) {
+      await window.fetch("https://docs.google.com/document/d/x/save?id=1", { method: "POST", body: b });
+    }
+  }, bodies);
   await flush(page);
 
   const s = await page.evaluate(() => window.__session());
