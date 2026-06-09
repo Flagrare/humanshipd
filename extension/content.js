@@ -3,9 +3,9 @@
 // typed input from pasted input. The captured text is only ever sent to the
 // LOCAL humanshipd host (for hashing); it is not transmitted anywhere else.
 //
-// Note: Google Docs renders to <canvas>, so its text isn't readable here — this
-// POC adapter targets ordinary web editors. Docs needs its own (Draftback-style)
-// capture path, which is future work.
+// Note: Google Docs renders to <canvas>, so its text isn't readable here — it has
+// its own adapter (gdocs-inject.js + gdocs.js), and the manifest excludes
+// docs.google.com from this generic script so the two don't both answer getSession.
 
 (() => {
   let startTime = null;

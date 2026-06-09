@@ -37,7 +37,7 @@ button.addEventListener("click", async () => {
   }
   if (!session.final_text || !session.final_text.trim()) {
     show(
-      "Couldn't read any text from this editor — it may be canvas- or model-based (like Google Docs). Try a plain text box, or the macOS app.",
+      "Couldn't read any text from this editor — it may be canvas- or model-based. Try a plain text box, or the macOS app.",
       "err"
     );
     return;

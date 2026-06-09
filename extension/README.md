@@ -12,12 +12,18 @@ text the same way:
 - **Works:** real `<textarea>` / `<input>` fields, and rich `contenteditable`
   editors (tiptap, ProseMirror, Quill…), including ones inside `about:blank` /
   `designMode` iframes.
+- **Google Docs** has its own adapter (`gdocs-inject.js` + `gdocs.js`). Docs renders
+  to `<canvas>`, so its text isn't in the DOM — instead a MAIN-world script observes
+  Docs' own `/save` mutation requests and replays them into the same content-free
+  session, while the `paste` event supplies the AI-dump signal (Decisions 1 & 2).
+  The parse/replay/merge logic is covered by `tests/gdocs.spec.js`; live end-to-end
+  validation on a logged-in doc is the remaining step. (Historical-import from a
+  doc's revision log is handled separately by `core/src/gdocs.rs` and makes no paste
+  claim.)
 - **Refused, on purpose:** *code* editors (Ace, CodeMirror, Monaco) type into a
   hidden proxy textarea and keep the document in their own model + virtualized DOM,
-  so a content script can't read it; *canvas* editors (Google Docs) render text to
-  a `<canvas>`. In both cases the popup now declines with a clear message instead
-  of issuing a credential bound to empty or partial text. Reading these would need
-  an editor-specific adapter injected into the page's main world (future work).
+  so a content script can't read it — the popup declines with a clear message
+  instead of issuing a credential bound to empty or partial text.
 - **Out of reach here:** native desktop apps (Word, TextEdit) — use the macOS
   capture tool, which records the same way and writes the matching document file
   alongside the credential.
@@ -43,8 +49,10 @@ Paste a chunk of text mid-session to see the AI-paste signal: the credential's
 
 ## Tests
 
-The capture logic (typed vs. pasted classification) has a Playwright regression
-that injects the real `content.js` into a page and drives typing + a paste:
+The capture logic has Playwright regressions that load the real scripts into a
+page: `capture.spec.js` (generic typed-vs-pasted classification in `content.js`)
+and `gdocs.spec.js` (the Docs adapter — `/save` op replay, paste flagging, and the
+inject's body parsing):
 
 ```bash
 cd extension/tests && npm i && npx playwright install chromium && npm test
