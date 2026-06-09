@@ -3,6 +3,32 @@
 All notable changes to humanshipd are recorded here. The project is a
 research-grade preview; versions are milestones, not releases on crates.io.
 
+## [0.6.0] — 2026-06-09 — Cross-session continuity
+
+Your writing in Google Docs now accumulates into one credential across days and
+tab-closes, instead of restarting every time you reopen the doc.
+
+### Added
+
+- **Capture survives closing the tab.** The Google Docs adapter saves each editing
+  session to local extension storage, keyed by the document. Reopen the same doc and
+  it resumes where you left off, so a piece written over many sittings issues as a
+  single record spanning the whole effort — not just your last sitting. The report
+  now shows how many sessions and the time from first to last edit.
+- **An honest refusal for unwitnessed writing.** If a document already had content
+  before the extension started watching — or was edited somewhere it couldn't see —
+  issuing now **declines** with "this document wasn't captured from the start,"
+  rather than vouch for writing it never observed.
+
+### Changed
+
+- **Replay and accumulation moved into the core.** Reconstructing the document from
+  its edit ops, and aggregating typing time, pauses, and paste flags across sessions,
+  now happen once in the Rust core (shared by the in-browser signer and the macOS
+  tool) instead of being re-implemented in the extension's JavaScript. Cross-session
+  gaps no longer count as "pauses," and the writing timeline stays in true order
+  across sittings.
+
 ## [0.5.0] — 2026-06-09 — In-browser issuance (no native host)
 
 The browser extension no longer needs a separate program on your machine.

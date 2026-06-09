@@ -1366,7 +1366,7 @@ checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
 name = "humanshipd-core"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "c2pa",
  "hex",
@@ -1382,7 +1382,7 @@ dependencies = [
 
 [[package]]
 name = "humanshipd-macos-capture"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "accessibility-sys",
  "core-foundation 0.10.1",
@@ -1394,7 +1394,7 @@ dependencies = [
 
 [[package]]
 name = "humanshipd-registry"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "axum",
  "base64",
