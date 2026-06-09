@@ -60,3 +60,64 @@ impl CaptureLog {
         self.sessions.push(session);
     }
 }
+
+/// Why a log could not be turned into a credential.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LogError {
+    /// An op references a position the log never witnessed being written — the
+    /// document had pre-existing content, or was edited outside our capture.
+    Unwitnessed { pos: u64, buffer_len: u64 },
+}
+
+impl std::fmt::Display for LogError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogError::Unwitnessed { pos, buffer_len } => write!(
+                f,
+                "edit at position {pos} is beyond the {buffer_len} characters humanshipd witnessed — this document wasn't captured from the start"
+            ),
+        }
+    }
+}
+impl std::error::Error for LogError {}
+
+impl CaptureLog {
+    /// Replay every session's ops into the reconstructed document text. Errors with
+    /// [`LogError::Unwitnessed`] when an op falls beyond the witnessed buffer.
+    pub fn reconstruct_text(&self) -> Result<String, LogError> {
+        Ok(self.reconstruct_buffer()?.into_iter().collect())
+    }
+
+    fn reconstruct_buffer(&self) -> Result<Vec<char>, LogError> {
+        let mut buf: Vec<char> = Vec::new();
+        for session in &self.sessions {
+            for op in &session.ops {
+                match op {
+                    CapturedOp::Insert { pos, text, .. } => {
+                        let pos_u64 = *pos;
+                        let pos = *pos as usize;
+                        if pos > buf.len() {
+                            return Err(LogError::Unwitnessed {
+                                pos: pos_u64,
+                                buffer_len: buf.len() as u64,
+                            });
+                        }
+                        buf.splice(pos..pos, text.chars());
+                    }
+                    CapturedOp::Delete { pos, len, .. } => {
+                        let start = *pos as usize;
+                        let end = start + *len as usize;
+                        if end > buf.len() {
+                            return Err(LogError::Unwitnessed {
+                                pos: *pos,
+                                buffer_len: buf.len() as u64,
+                            });
+                        }
+                        buf.drain(start..end);
+                    }
+                }
+            }
+        }
+        Ok(buf)
+    }
+}

@@ -1,4 +1,4 @@
-use humanshipd_core::capture_log::{CaptureLog, CaptureSession, CapturedOp, DocumentIdentity, LOG_SCHEMA};
+use humanshipd_core::capture_log::{CaptureLog, CaptureSession, CapturedOp, DocumentIdentity, LOG_SCHEMA, LogError};
 
 fn session(id: &str, started: u64, ops: Vec<CapturedOp>) -> CaptureSession {
     CaptureSession {
@@ -22,4 +22,25 @@ fn capture_log_round_trips_through_json() {
     let back: CaptureLog = serde_json::from_str(&json).unwrap();
     assert_eq!(back, log);
     assert_eq!(back.sessions.len(), 1);
+}
+
+#[test]
+fn reconstructs_text_across_two_sessions() {
+    let mut log = CaptureLog::new(DocumentIdentity { kind: "gdocs".into(), id: "d".into() });
+    log.append(session("s1", 1000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 0, text: "Hello".into(), pasted: false },
+    ]));
+    log.append(session("s2", 90_000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 5, text: " world".into(), pasted: false },
+    ]));
+    assert_eq!(log.reconstruct_text().unwrap(), "Hello world");
+}
+
+#[test]
+fn declines_when_an_op_lands_beyond_the_witnessed_buffer() {
+    let mut log = CaptureLog::new(DocumentIdentity { kind: "gdocs".into(), id: "d".into() });
+    log.append(session("s1", 1000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 5, text: "x".into(), pasted: false },
+    ]));
+    assert!(matches!(log.reconstruct_text(), Err(LogError::Unwitnessed { .. })));
 }
