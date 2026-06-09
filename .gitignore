@@ -6,8 +6,9 @@
 web-verify/target/
 **/*.rs.bk
 
-# WASM build output (regenerate with `wasm-pack build`)
+# WASM build output (regenerate with `wasm-pack build` / extension/build-wasm.sh)
 web-verify/pkg/
+extension/pkg/
 
 # Node / Playwright (extension tests)
 node_modules/

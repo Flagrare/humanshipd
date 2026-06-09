@@ -1,5 +1,5 @@
-// Popup: grab the current writing session from the active tab, ask the host to
-// issue a credential, and download the resulting .c2pa file.
+// Popup: grab the current writing session from the active tab, sign a credential
+// in-browser (WASM, in a worker), and download it bundled with its document.
 
 const button = document.getElementById("issue");
 const status = document.getElementById("status");
@@ -7,6 +7,24 @@ const status = document.getElementById("status");
 function show(text, cls) {
   status.textContent = text;
   status.className = cls || "";
+}
+
+// Sign the credential in a Web Worker running the WASM core — off the popup thread,
+// and with no native host to install. Resolves to the .c2pa manifest Uint8Array.
+function issueViaWorker(session) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(chrome.runtime.getURL("issue-worker.js"), { type: "module" });
+    worker.onmessage = (event) => {
+      worker.terminate();
+      if (event.data?.ok) resolve(event.data.manifest);
+      else reject(new Error(event.data?.error || "issue failed"));
+    };
+    worker.onerror = (event) => {
+      worker.terminate();
+      reject(new Error(event.message || "worker error"));
+    };
+    worker.postMessage(session);
+  });
 }
 
 button.addEventListener("click", async () => {
@@ -43,11 +61,13 @@ button.addEventListener("click", async () => {
     return;
   }
 
-  show("Issuing credential via local host…");
+  show("Signing credential in your browser…");
   const author = document.getElementById("author").value.trim();
-  const result = await chrome.runtime.sendMessage({ type: "issue", session, author });
-  if (!result?.ok) {
-    show(`Host error: ${result?.error || "unknown"}`, "err");
+  let manifestBytes;
+  try {
+    manifestBytes = await issueViaWorker({ ...session, author });
+  } catch (e) {
+    show(`Could not issue: ${e.message}`, "err");
     return;
   }
 
@@ -56,7 +76,6 @@ button.addEventListener("click", async () => {
   // page. The document text is needed to reproduce the exact bytes the credential
   // is hash-bound to — especially for Google Docs, whose text lives only in the
   // cloud. The credential itself stays content-free; the text rides alongside it.
-  const manifestBytes = Uint8Array.from(atob(result.manifest_b64), (c) => c.charCodeAt(0));
   const docBytes = new TextEncoder().encode(session.final_text);
   const zipBytes = humanshipdZip.makeZip([
     { name: "humanshipd-credential.c2pa", bytes: manifestBytes },

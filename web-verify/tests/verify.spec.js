@@ -162,6 +162,36 @@ test("issues a credential in-browser (WASM) and it verifies as an exact file", a
   expect(out.signed).toBe(true);
 });
 
+test("in-browser issuance flags a keystroke-less paste and carries the author", async ({ page }) => {
+  // The session's signals must survive in-browser issuance: a large un-keyed
+  // insertion flags the AI-dump, and a self-asserted author rides along.
+  await page.goto("/verify.html");
+  await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();
+  const out = await page.evaluate(async () => {
+    const typed = "I typed this part. ";
+    const pasted = "THEN A LARGE PASTED BLOCK OF AI TEXT APPEARED HERE.";
+    const text = typed + pasted;
+    const session = JSON.stringify({
+      session_id: "wasm-flags",
+      surface_kind: "gdocs",
+      surface_app: "docs.google.com",
+      final_text: text,
+      events: [
+        { at_ms: 0, inserted_chars: typed.length, deleted_chars: 0, keystrokes: typed.length },
+        { at_ms: 500, inserted_chars: pasted.length, deleted_chars: 0, keystrokes: 0 }, // paste
+      ],
+      author: "Ada Lovelace",
+    });
+    const manifest = window.issue_credential(session);
+    const r = window.verify_credential_named(manifest, new TextEncoder().encode(text), "doc.txt");
+    return { valid: r.valid, ai: r.ai_dump_flags, author: r.author, claim: r.claim };
+  });
+  expect(out.valid).toBe(true);
+  expect(out.ai).toBeGreaterThanOrEqual(1);
+  expect(out.claim).toContain("WARNING");
+  expect(out.author).toBe("Ada Lovelace");
+});
+
 test("a single .zip bundle (credential + document) verifies as an exact file", async ({ page }) => {
   await page.goto("/verify.html");
   await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();

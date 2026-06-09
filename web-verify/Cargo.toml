@@ -3,7 +3,7 @@ name = "humanshipd-web-verify"
 version = "0.4.0"
 edition = "2021"
 license = "MIT"
-description = "WASM wrapper over humanshipd-core::verify so a browser can check a credential with the exact same logic as the CLI."
+description = "WASM wrapper over humanshipd-core so a browser can issue and verify credentials with the exact same logic as the CLI — no native host."
 
 # Detached from the parent workspace: it builds the core with the `wasm` feature
 # (pure-Rust crypto), which must not unify with the native (OpenSSL) build.

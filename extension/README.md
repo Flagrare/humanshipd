@@ -1,10 +1,11 @@
 # humanshipd browser extension (POC)
 
-A thin Chrome (MV3) adapter that watches how you write in a web text field, then
-asks the local humanshipd host to issue a **Human Authored** credential for it.
-It holds no credential logic — capture happens in the page, signing happens in
-the local host. The captured text is sent only to that local host (to compute a
-hash); nothing is transmitted off your machine.
+A Chrome (MV3) extension that watches how you write in a web text field and issues
+a **Human Authored** credential for it — **entirely in your browser**. Capture
+happens in the page; signing happens in a Web Worker running the credential core
+compiled to WASM (`extension/pkg/`, built from `web-verify`). There's no separate
+program to install and no native messaging — just load the extension. Nothing is
+transmitted off your machine.
 
 It captures text typed **into a web page**, but not every web editor exposes its
 text the same way:
@@ -30,18 +31,18 @@ text the same way:
 
 ## Try it
 
-1. **Build the host:** `cargo build -p humanshipd-host`
+1. **Build the WASM bundle** (once, and after changing the Rust):
+   `bash extension/build-wasm.sh` (needs [`wasm-pack`](https://rustwasm.github.io/wasm-pack/)).
+   It writes `extension/pkg/`.
 2. **Load the extension:** open `chrome://extensions`, turn on *Developer mode*,
-   click *Load unpacked*, and select this `extension/` folder. Copy the
-   extension's ID that appears.
-3. **Register the host** with that ID:
-   `bash extension/host/install.sh <EXTENSION_ID>` then fully quit and reopen Chrome.
-4. **Use it:** open any page with a text box, type a few sentences, then click the
+   click *Load unpacked*, and select this `extension/` folder. That's the whole
+   setup — no host to register, no Chrome restart.
+3. **Use it:** open any page with a text box, type a few sentences, then click the
    extension icon → *Issue Human Authored credential*. One file lands in your
    Downloads: `humanshipd-credential.zip`, bundling the credential
    (`humanshipd-credential.c2pa`) with the exact text it's bound to
    (`humanshipd-document.txt`) — so there's nothing to reconstruct by hand.
-5. **Verify it** by dropping the `.zip` into the verify page
+4. **Verify it** by dropping the `.zip` into the verify page
    (<https://flagrare.github.io/humanshipd/>) — it unzips both in-browser. Or from
    the CLI, unzip first:
    `cargo run --example verify_credential -- humanshipd-credential.c2pa humanshipd-document.txt`

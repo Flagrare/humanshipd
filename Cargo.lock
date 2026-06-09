@@ -1381,16 +1381,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "humanshipd-host"
-version = "0.4.0"
-dependencies = [
- "base64",
- "humanshipd-core",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "humanshipd-macos-capture"
 version = "0.4.0"
 dependencies = [

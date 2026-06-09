@@ -2,11 +2,13 @@
   "manifest_version": 3,
   "name": "humanshipd (Human Authored)",
   "version": "0.0.1",
-  "description": "Records how text was written and issues a Human Authored credential via the local humanshipd host.",
-  "permissions": ["nativeMessaging", "activeTab", "scripting", "downloads"],
+  "description": "Records how text was written and issues a Human Authored credential — signed locally in your browser.",
+  "permissions": ["activeTab", "scripting", "downloads"],
   "host_permissions": ["<all_urls>"],
-  "background": { "service_worker": "background.js" },
   "action": { "default_popup": "popup.html", "default_title": "humanshipd" },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
