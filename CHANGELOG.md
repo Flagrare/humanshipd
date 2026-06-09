@@ -3,6 +3,31 @@
 All notable changes to humanshipd are recorded here. The project is a
 research-grade preview; versions are milestones, not releases on crates.io.
 
+## [0.5.0] — 2026-06-09 — In-browser issuance (no native host)
+
+The browser extension no longer needs a separate program on your machine.
+
+### Changed
+
+- **The extension signs credentials in your browser.** Issuing now runs the
+  credential core compiled to WebAssembly, in a Web Worker — the same Rust signing
+  the old native host called, just in-page. Setup collapses to *build the WASM once
+  (`extension/build-wasm.sh`) and load the extension unpacked*: no host binary to
+  build, no `install.sh`, no per-profile registration, no Chrome restart, and no
+  more "Specified native messaging host not found." (This is also what makes the
+  extension shippable through the Chrome Web Store.)
+
+### Removed
+
+- **The native messaging host** (`humanshipd-host`), its installer, and the
+  extension's `nativeMessaging` permission. The macOS capture tool is unaffected — it
+  always linked the core directly.
+
+### Notes
+
+- In-browser issuance does not offer opt-in RFC 3161 timestamping (the TSA client
+  isn't WASM-compatible); timestamping remains available on the command-line path.
+
 ## [0.4.0] — 2026-06-09 — Google Docs capture & one-file credentials
 
 Capture moves to where people actually write, and issuing produces a single file.
