@@ -24,6 +24,9 @@ pub use credential::{
 };
 #[cfg(feature = "native")]
 pub use credential::issue_sidecar_timestamped;
+pub use capture_log::{
+    CaptureLog, CaptureSession, CapturedOp, DocumentIdentity, LogError, LOG_SCHEMA,
+};
 pub use error::CoreError;
 pub use record::{
     BurstStats, DocumentBinding, EvidenceFlags, PauseStats, ProcessStats, Provenance,
