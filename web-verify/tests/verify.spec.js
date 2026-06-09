@@ -69,6 +69,47 @@ function makeDocx(text) {
   return storedZip("word/document.xml", Buffer.from(xml, "utf8"));
 }
 
+// Multi-entry stored zip — mirrors the extension's bundle format (extension/zip.js)
+// so this test exercises the verify page's reader against the real writer's output.
+function bundleZip(files) {
+  const local = [];
+  const central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = Buffer.from(f.name);
+    const crc = crc32(f.bytes);
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0);
+    lh.writeUInt16LE(20, 4);
+    lh.writeUInt16LE(0, 8); // stored
+    lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(f.bytes.length, 18);
+    lh.writeUInt32LE(f.bytes.length, 22);
+    lh.writeUInt16LE(name.length, 26);
+    local.push(lh, name, f.bytes);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0);
+    ch.writeUInt16LE(20, 4);
+    ch.writeUInt16LE(20, 6);
+    ch.writeUInt16LE(0, 10); // stored
+    ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(f.bytes.length, 20);
+    ch.writeUInt32LE(f.bytes.length, 24);
+    ch.writeUInt16LE(name.length, 28);
+    ch.writeUInt32LE(offset, 42);
+    central.push(ch, name);
+    offset += 30 + name.length + f.bytes.length;
+  }
+  const cd = Buffer.concat(central);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(files.length, 8);
+  eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(cd.length, 12);
+  eocd.writeUInt32LE(offset, 16);
+  return Buffer.concat([...local, cd, eocd]);
+}
+
 async function verify(page, credBuf, doc) {
   await page.goto("/verify.html");
   await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();
@@ -93,6 +134,21 @@ test("the bundled demo reads as an exact-file match", async ({ page }) => {
   // Decision 6: the trust framing must be honest about the self-signed default.
   await expect(page.locator("#trust")).toContainText("self-signed");
   await expect(page.locator("#trust")).toContainText("not who wrote it");
+});
+
+test("a single .zip bundle (credential + document) verifies as an exact file", async ({ page }) => {
+  await page.goto("/verify.html");
+  await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();
+  const zip = bundleZip([
+    { name: "humanshipd-credential.c2pa", bytes: credential() },
+    { name: "humanshipd-document.txt", bytes: Buffer.from(documentText(), "utf8") },
+  ]);
+  await page
+    .locator("#credential")
+    .setInputFiles({ name: "humanshipd-credential.zip", mimeType: "application/zip", buffer: zip });
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.locator("#verdict")).toContainText("exact file");
+  await expect(page.locator("#result")).toHaveClass(/valid/);
 });
 
 test("a .docx of the same writing verifies as a content match", async ({ page }) => {

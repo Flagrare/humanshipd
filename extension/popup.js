@@ -51,22 +51,24 @@ button.addEventListener("click", async () => {
     return;
   }
 
-  // Save the credential AND the exact document text it is bound to, so verifying
-  // is just dropping both files in — no fragile copy-paste to reproduce the bytes.
-  const docUrl =
-    "data:text/plain;charset=utf-8," + encodeURIComponent(session.final_text);
+  // Bundle the credential AND the exact document text it's bound to into ONE zip,
+  // so it's a single download (not two prompts) and a single drop on the verify
+  // page. The document text is needed to reproduce the exact bytes the credential
+  // is hash-bound to — especially for Google Docs, whose text lives only in the
+  // cloud. The credential itself stays content-free; the text rides alongside it.
+  const manifestBytes = Uint8Array.from(atob(result.manifest_b64), (c) => c.charCodeAt(0));
+  const docBytes = new TextEncoder().encode(session.final_text);
+  const zipBytes = humanshipdZip.makeZip([
+    { name: "humanshipd-credential.c2pa", bytes: manifestBytes },
+    { name: "humanshipd-document.txt", bytes: docBytes },
+  ]);
   await chrome.downloads.download({
-    url: docUrl,
-    filename: "humanshipd-document.txt",
-    saveAs: false,
-  });
-  await chrome.downloads.download({
-    url: `data:application/octet-stream;base64,${result.manifest_b64}`,
-    filename: "humanshipd-credential.c2pa",
+    url: `data:application/zip;base64,${humanshipdZip.bytesToBase64(zipBytes)}`,
+    filename: "humanshipd-credential.zip",
     saveAs: false,
   });
   show(
-    "Saved to your Downloads: humanshipd-credential.c2pa + humanshipd-document.txt. Drop BOTH into the verify page.",
+    "Saved humanshipd-credential.zip to your Downloads. Drop it into the verify page.",
     "ok"
   );
 });

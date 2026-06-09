@@ -76,10 +76,10 @@
       and <a href="./examples/document.txt" download>document</a> to try the upload flow yourself.
     </p>
 
-    <label for="credential">Credential (<code>.c2pa</code>)</label>
+    <label for="credential">Credential — the <code>.zip</code> bundle, or a <code>.c2pa</code> file</label>
     <input id="credential" type="file" />
 
-    <label for="document">The document it should belong to</label>
+    <label for="document">The document it should belong to <em>(skip if you dropped the .zip bundle)</em></label>
     <input id="document" type="file" />
 
     <button id="verify" disabled>Verify</button>
@@ -114,6 +114,27 @@
         const file = input.files[0];
         if (!file) return null;
         return new Uint8Array(await file.arrayBuffer());
+      }
+
+      // Read a STORED (uncompressed) zip — the format the extension's bundle uses.
+      // Walks local file headers; returns { name: Uint8Array }. No inflate needed.
+      function readStoredZip(buf) {
+        const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+        const dec = new TextDecoder();
+        const out = {};
+        let i = 0;
+        while (i + 30 <= buf.length && dv.getUint32(i, true) === 0x04034b50) {
+          const method = dv.getUint16(i + 8, true);
+          const size = dv.getUint32(i + 18, true);
+          const nameLen = dv.getUint16(i + 26, true);
+          const extraLen = dv.getUint16(i + 28, true);
+          const nameStart = i + 30;
+          const name = dec.decode(buf.subarray(nameStart, nameStart + nameLen));
+          const dataStart = nameStart + nameLen + extraLen;
+          if (method === 0) out[name] = buf.subarray(dataStart, dataStart + size);
+          i = dataStart + size;
+        }
+        return out;
       }
 
       // Fixed label/class maps — provenance & summary are enum strings from the
@@ -483,11 +504,29 @@
       }
 
       button.addEventListener("click", async () => {
+        const credInput = document.getElementById("credential");
         const docInput = document.getElementById("document");
-        const credential = await bytes(document.getElementById("credential"));
+        const credFile = credInput.files[0];
+
+        // One-file path: a .zip bundle from the extension carries both the
+        // credential and its exact bound document. Unzip and verify in one step.
+        if (credFile && credFile.name.toLowerCase().endsWith(".zip")) {
+          const entries = readStoredZip(new Uint8Array(await credFile.arrayBuffer()));
+          const credential = entries["humanshipd-credential.c2pa"];
+          const doc = entries["humanshipd-document.txt"];
+          if (!credential || !doc) {
+            alert("That .zip doesn't contain a humanshipd credential + document.");
+            return;
+          }
+          render(verify_credential_named(credential, doc, "humanshipd-document.txt"));
+          return;
+        }
+
+        // Two-file path: a .c2pa credential plus the document it belongs to.
+        const credential = await bytes(credInput);
         const doc = await bytes(docInput);
         if (!credential || !doc) {
-          alert("Pick both a credential and its document.");
+          alert("Drop the .zip bundle, or pick both a credential and its document.");
           return;
         }
         // The filename picks the text extractor (.txt/.docx in-browser; .pdf via CLI).

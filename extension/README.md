@@ -37,11 +37,13 @@ text the same way:
 3. **Register the host** with that ID:
    `bash extension/host/install.sh <EXTENSION_ID>` then fully quit and reopen Chrome.
 4. **Use it:** open any page with a text box, type a few sentences, then click the
-   extension icon → *Issue Human Authored credential*. Two files land in your
-   Downloads: `humanshipd-credential.c2pa` and `humanshipd-document.txt` (the exact
-   text the credential is bound to — so there's nothing to reconstruct by hand).
-5. **Verify it** by dropping both files into the verify page
-   (<https://flagrare.github.io/humanshipd/>), or from the CLI:
+   extension icon → *Issue Human Authored credential*. One file lands in your
+   Downloads: `humanshipd-credential.zip`, bundling the credential
+   (`humanshipd-credential.c2pa`) with the exact text it's bound to
+   (`humanshipd-document.txt`) — so there's nothing to reconstruct by hand.
+5. **Verify it** by dropping the `.zip` into the verify page
+   (<https://flagrare.github.io/humanshipd/>) — it unzips both in-browser. Or from
+   the CLI, unzip first:
    `cargo run --example verify_credential -- humanshipd-credential.c2pa humanshipd-document.txt`
 
 Paste a chunk of text mid-session to see the AI-paste signal: the credential's
