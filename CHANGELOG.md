@@ -3,6 +3,31 @@
 All notable changes to humanshipd are recorded here. The project is a
 research-grade preview; versions are milestones, not releases on crates.io.
 
+## [0.4.0] — 2026-06-09 — Google Docs capture & one-file credentials
+
+Capture moves to where people actually write, and issuing produces a single file.
+
+### Added
+
+- **Google Docs live capture.** Docs renders to `<canvas>`, so its text and edits
+  are invisible to an ordinary content script. The extension now records the writing
+  process directly from Docs' own `/save` stream (replayed into the same
+  content-free session as every other surface), with the `paste` event supplying the
+  AI-dump signal. The historical revision-log path (`core`'s `gdocs` parser) is
+  unchanged and still makes no paste claim.
+- **One-file credentials.** Issuing now downloads a single `humanshipd-credential.zip`
+  bundling the credential and the exact text it's bound to, instead of two separate
+  download prompts. The verify page accepts that `.zip` as a single drop and unzips
+  it in-browser; the two-file flow still works.
+
+### Fixed
+
+- **Editor freeze on Google Docs.** The capture script patched `fetch`/`XHR` in all
+  ~8 Docs frames at document start; it now patches only the top frame (where `/save`
+  originates), eliminating the overhead/interference that could bog the editor down.
+- **Native host hardening.** The host capped the native-message frame length so a
+  corrupt length prefix can no longer trigger a multi-gigabyte allocation.
+
 ## [0.3.0] — 2026-06-08 — Honest trust & timestamping
 
 The credential now tells you exactly what its signature does and does not prove, and
