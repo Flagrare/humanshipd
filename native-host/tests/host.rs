@@ -18,6 +18,16 @@ fn message_frame_round_trips_and_reports_eof() {
 }
 
 #[test]
+fn an_oversized_frame_length_is_rejected_not_allocated() {
+    // A corrupt/hostile length prefix (here ~4 GiB) must error out immediately,
+    // never attempt the allocation that would starve the machine of memory.
+    let framed = [0xffu8, 0xff, 0xff, 0xff]; // u32::MAX length, no payload follows
+    let mut cursor = Cursor::new(framed.to_vec());
+    let err = read_message(&mut cursor).expect_err("oversized length must error");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+}
+
+#[test]
 fn ping_returns_pong() {
     let request: Request = serde_json::from_str(r#"{"type":"ping"}"#).unwrap();
     assert!(matches!(process(request), Response::Pong { .. }));
