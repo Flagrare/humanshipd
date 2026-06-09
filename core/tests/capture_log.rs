@@ -61,3 +61,53 @@ fn build_record_reports_two_sessions_and_aggregates_active_time() {
     assert_eq!(record.process.active_ms, 3_000);
     assert_eq!(record.document_binding.char_count, "Hello! more.".chars().count() as u64);
 }
+
+#[test]
+fn cross_session_gap_is_not_a_pause_and_timeline_is_monotonic() {
+    let mut log = CaptureLog::new(DocumentIdentity { kind: "gdocs".into(), id: "d".into() });
+    log.append(session("s1", 1_000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 0, text: "ab".into(), pasted: false },
+        CapturedOp::Insert { at_ms: 100, pos: 2, text: "cd".into(), pasted: false },
+    ]));
+    // A day later — the gap between sessions must NOT count as a pause.
+    log.append(session("s2", 90_000_000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 4, text: "ef".into(), pasted: false },
+        CapturedOp::Insert { at_ms: 100, pos: 6, text: "gh".into(), pasted: false },
+    ]));
+    let r = log.build_record().unwrap();
+    assert_eq!(r.process.pauses.gt_2s, 0, "cross-session gap must not be a pause");
+    let mut prev = 0u64;
+    for pt in &r.process.timeline {
+        assert!(pt.at_ms >= prev, "timeline must be monotonic across sessions");
+        prev = pt.at_ms;
+    }
+    assert_eq!(r.first_capture_at_ms, 1_000);
+    assert_eq!(r.last_capture_at_ms, 90_000_000);
+}
+
+#[test]
+fn a_paste_in_a_later_session_flags_an_unkeyed_insertion() {
+    let mut log = CaptureLog::new(DocumentIdentity { kind: "gdocs".into(), id: "d".into() });
+    log.append(session("s1", 1_000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 0, text: "typed ".into(), pasted: false },
+    ]));
+    log.append(session("s2", 2_000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 6, text: "PASTED BLOCK OF TWENTYPLUS CHARS".into(), pasted: true },
+    ]));
+    let r = log.build_record().unwrap();
+    assert_eq!(r.evidence_flags.large_unkeyed_insertions, 1);
+    assert!(r.process.keyed_fraction < 1.0);
+}
+
+#[test]
+fn build_record_declines_when_a_later_session_edits_unwitnessed_content() {
+    let mut log = CaptureLog::new(DocumentIdentity { kind: "gdocs".into(), id: "d".into() });
+    log.append(session("s1", 1_000, vec![
+        CapturedOp::Insert { at_ms: 0, pos: 0, text: "hi".into(), pasted: false },
+    ]));
+    // Delete a 5-char range from a 2-char buffer → beyond what we witnessed.
+    log.append(session("s2", 2_000, vec![
+        CapturedOp::Delete { at_ms: 0, pos: 0, len: 5 },
+    ]));
+    assert!(matches!(log.build_record(), Err(LogError::Unwitnessed { .. })));
+}
