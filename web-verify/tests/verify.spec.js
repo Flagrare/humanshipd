@@ -239,3 +239,42 @@ test("a PDF is honestly directed to the command-line tool", async ({ page }) => 
   await expect(page.locator("#verdict")).toContainText("Could not verify");
   await expect(page.locator("#verdict")).toContainText("command-line tool");
 });
+
+test("issues a credential from a multi-session capture log (WASM)", async ({ page }) => {
+  await page.goto("/verify.html");
+  await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();
+  const out = await page.evaluate(async () => {
+    const log = {
+      schema: "authorshipped/log@1",
+      identity: { kind: "gdocs", id: "doc-x" },
+      sessions: [
+        { session_id: "s1", surface_kind: "gdocs", surface_app: "docs.google.com", started_at_ms: 1000,
+          ops: [{ op: "insert", at_ms: 0, pos: 0, text: "Hello", pasted: false }] },
+        { session_id: "s2", surface_kind: "gdocs", surface_app: "docs.google.com", started_at_ms: 90000000,
+          ops: [{ op: "insert", at_ms: 0, pos: 5, text: " world", pasted: false }] },
+      ],
+    };
+    const manifest = window.issue_from_capture_log(JSON.stringify(log));
+    const doc = new TextEncoder().encode("Hello world");
+    const r = window.verify_credential_named(manifest, doc, "doc.txt");
+    return { valid: r.valid, tier: r.verdict && r.verdict.tier };
+  });
+  expect(out.valid).toBe(true);
+  expect(out.tier).toBe("exact_file");
+});
+
+test("declines issuance for an unwitnessed (pre-existing) document", async ({ page }) => {
+  await page.goto("/verify.html");
+  await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();
+  const err = await page.evaluate(async () => {
+    const log = {
+      schema: "authorshipped/log@1",
+      identity: { kind: "gdocs", id: "doc-x" },
+      sessions: [{ session_id: "s1", surface_kind: "gdocs", surface_app: "docs.google.com", started_at_ms: 1000,
+        ops: [{ op: "insert", at_ms: 0, pos: 5, text: "x", pasted: false }] }],
+    };
+    try { window.issue_from_capture_log(JSON.stringify(log)); return null; }
+    catch (e) { return String(e.message || e); }
+  });
+  expect(err).toContain("wasn't captured from the start");
+});

@@ -2,6 +2,7 @@
 //! same `humanshipd-core::credential::read_sidecar` logic as the CLI. The browser
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
+use humanshipd_core::capture_log::CaptureLog;
 use humanshipd_core::credential::{
     issue_sidecar_with_author, read_sidecar_with_text, CredentialReadout, TrustStatus, Verdict,
 };
@@ -64,6 +65,32 @@ pub fn issue_credential(session_json: &str) -> Result<Vec<u8>, JsValue> {
     let record = build_record(&input);
     issue_sidecar_with_author(&record, dto.final_text.as_bytes(), dto.author.as_deref())
         .map_err(|e| JsValue::from_str(&format!("issue failed: {e}")))
+}
+
+/// Issue a credential from an accumulated capture log (cross-session continuity).
+/// Replays + aggregates in core, then signs. Throws if the log references content
+/// humanshipd never witnessed (pre-existing/externally-edited document).
+#[wasm_bindgen]
+pub fn issue_from_capture_log(log_json: &str, author: Option<String>) -> Result<Vec<u8>, JsValue> {
+    let log: CaptureLog = serde_json::from_str(log_json)
+        .map_err(|e| JsValue::from_str(&format!("bad capture log: {e}")))?;
+    let record = log
+        .build_record()
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let text = log
+        .reconstruct_text()
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    issue_sidecar_with_author(&record, text.as_bytes(), author.as_deref())
+        .map_err(|e| JsValue::from_str(&format!("issue failed: {e}")))
+}
+
+/// Reconstruct the bound document text from a capture log (single source of truth
+/// for replay — used to build the zip's `document.txt`, never to re-derive in JS).
+#[wasm_bindgen]
+pub fn reconstruct_text_from_log(log_json: &str) -> Result<String, JsValue> {
+    let log: CaptureLog = serde_json::from_str(log_json)
+        .map_err(|e| JsValue::from_str(&format!("bad capture log: {e}")))?;
+    log.reconstruct_text().map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Serializable view of the tiered [`Verdict`] for the page (Decision 4).
