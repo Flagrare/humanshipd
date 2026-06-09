@@ -2,12 +2,69 @@
 //! same `humanshipd-core::credential::read_sidecar` logic as the CLI. The browser
 //! shows the same verdict and the same honest claim — no separate trust surface.
 
-use humanshipd_core::credential::{read_sidecar_with_text, CredentialReadout, TrustStatus, Verdict};
-use humanshipd_core::formats::extract_named;
+use humanshipd_core::credential::{
+    issue_sidecar_with_author, read_sidecar_with_text, CredentialReadout, TrustStatus, Verdict,
+};
 use humanshipd_core::record::TimelinePoint;
 use humanshipd_core::report::{render_process_shape, render_report, ProcessShape, ProvenanceReport};
-use serde::Serialize;
+use humanshipd_core::session::{build_record, EditEvent, SessionInput};
+use humanshipd_core::formats::extract_named;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
+
+// --- SPIKE: in-browser issuance (Decision: WASM-in-worker issuance) -----------
+// Proves the issuance path (ephemeral key-gen + c2pa signing) runs under WASM, so
+// the extension can issue without a native host. If this works, it graduates into
+// the real worker-backed flow.
+
+#[derive(Deserialize)]
+struct SessionDto {
+    session_id: String,
+    surface_kind: String,
+    surface_app: String,
+    final_text: String,
+    events: Vec<EventDto>,
+    #[serde(default)]
+    author: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct EventDto {
+    at_ms: u64,
+    inserted_chars: u64,
+    deleted_chars: u64,
+    keystrokes: u64,
+    #[serde(default)]
+    at_offset: Option<u64>,
+}
+
+/// Issue a credential entirely in the browser from a captured session (JSON).
+/// Returns the `.c2pa` manifest bytes. The key-gen + signing run in WASM.
+#[wasm_bindgen]
+pub fn issue_credential(session_json: &str) -> Result<Vec<u8>, JsValue> {
+    let dto: SessionDto = serde_json::from_str(session_json)
+        .map_err(|e| JsValue::from_str(&format!("bad session json: {e}")))?;
+    let input = SessionInput {
+        session_id: dto.session_id,
+        surface_kind: dto.surface_kind,
+        surface_app: dto.surface_app,
+        final_text: dto.final_text.clone(),
+        events: dto
+            .events
+            .into_iter()
+            .map(|e| EditEvent {
+                at_ms: e.at_ms,
+                inserted_chars: e.inserted_chars,
+                deleted_chars: e.deleted_chars,
+                keystrokes: e.keystrokes,
+                at_offset: e.at_offset,
+            })
+            .collect(),
+    };
+    let record = build_record(&input);
+    issue_sidecar_with_author(&record, dto.final_text.as_bytes(), dto.author.as_deref())
+        .map_err(|e| JsValue::from_str(&format!("issue failed: {e}")))
+}
 
 /// Serializable view of the tiered [`Verdict`] for the page (Decision 4).
 #[derive(Serialize)]

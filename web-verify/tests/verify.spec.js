@@ -136,6 +136,32 @@ test("the bundled demo reads as an exact-file match", async ({ page }) => {
   await expect(page.locator("#trust")).toContainText("not who wrote it");
 });
 
+test("issues a credential in-browser (WASM) and it verifies as an exact file", async ({ page }) => {
+  // De-risk spike for in-browser issuance: ephemeral key-gen + c2pa signing must run
+  // in WASM, then read back as a valid exact-file match — all without a native host.
+  await page.goto("/verify.html");
+  await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();
+  const out = await page.evaluate(async () => {
+    const text = "Provenance beats inference. We bind a credential to the writing process.";
+    const session = JSON.stringify({
+      session_id: "wasm-spike",
+      surface_kind: "gdocs",
+      surface_app: "docs.google.com",
+      final_text: text,
+      events: [{ at_ms: 0, inserted_chars: text.length, deleted_chars: 0, keystrokes: text.length }],
+      author: "Ada",
+    });
+    const manifest = window.issue_credential(session); // Uint8Array, signed in WASM
+    const doc = new TextEncoder().encode(text);
+    const r = window.verify_credential_named(manifest, doc, "doc.txt");
+    return { len: manifest.length, valid: r.valid, tier: r.verdict && r.verdict.tier, signed: r.trust && r.trust.signed };
+  });
+  expect(out.len).toBeGreaterThan(1000);
+  expect(out.valid).toBe(true);
+  expect(out.tier).toBe("exact_file");
+  expect(out.signed).toBe(true);
+});
+
 test("a single .zip bundle (credential + document) verifies as an exact file", async ({ page }) => {
   await page.goto("/verify.html");
   await expect(page.getByRole("button", { name: "Verify" })).toBeEnabled();

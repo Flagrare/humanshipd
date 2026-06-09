@@ -97,7 +97,7 @@
     </div>
 
     <script type="module">
-      import init, { verify_credential, verify_credential_named } from "./pkg/humanshipd_web_verify.js";
+      import init, { verify_credential, verify_credential_named, issue_credential } from "./pkg/humanshipd_web_verify.js";
 
       const button = document.getElementById("verify");
       const result = document.getElementById("result");
@@ -108,6 +108,7 @@
       // Expose for automated tests; harmless for normal use.
       window.verify_credential = verify_credential;
       window.verify_credential_named = verify_credential_named;
+      window.issue_credential = issue_credential; // in-browser issuance (worker rework)
       button.disabled = false;
 
       async function bytes(input) {
