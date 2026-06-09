@@ -1,20 +1,21 @@
-// Regression for the Google Docs live-capture adapter (Decisions 1 + 2), codifying
-// the logic so it can be re-checked without a live Google account: the isolated
-// gdocs.js replays /save mutation ops into the document + event stream, flags a
-// paste as a keystroke-less insertion, and the MAIN-world gdocs-inject.js pulls
-// those ops out of a save POST body.
+// Regression for the Google Docs live-capture adapter: gdocs.js records normalized
+// ops into a capture log and flags pastes as keystroke-less insertions. The
+// MAIN-world gdocs-inject.js extracts ops from /save POST bodies and feeds them
+// into the session.
 //
 // Run: cd extension/tests && npm i && npx playwright install chromium && npm test
 //
 // The live end-to-end (real injection on docs.google.com + real paste) is validated
-// by hand against a logged-in test account; this file covers the parse/replay/merge.
+// by hand against a logged-in test account; this file covers the parse/capture/merge.
 
 const { test, expect } = require("@playwright/test");
 const fs = require("fs");
 const path = require("path");
 
 const read = (f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8");
-const GDOCS = read("gdocs.js");
+// Patch location.pathname to a fixed doc path so docId resolves without needing to
+// redefine window.location (Chromium blocks that even in Playwright page contexts).
+const GDOCS = read("gdocs.js").replace("location.pathname", '"/document/d/DOC/edit"');
 const INJECT = read("gdocs-inject.js");
 
 // Load gdocs.js (and optionally the MAIN-world inject) into a blank page with a
@@ -23,8 +24,15 @@ async function boot(page, { withInject = false } = {}) {
   await page.goto("data:text/html,<body></body>");
   await page.evaluate(
     ({ gdocs, inject, withInject }) => {
+      window.__store = window.__store || {};
       let getSession = null;
-      window.chrome = { runtime: { onMessage: { addListener: (fn) => (getSession = fn) } } };
+      window.chrome = {
+        runtime: { onMessage: { addListener: (fn) => (getSession = fn) } },
+        storage: { local: {
+          set: (obj) => Object.assign(window.__store, obj),
+          get: (_k, cb) => cb({ ...window.__store }),
+        } },
+      };
       // Safe: `inject`/`gdocs` are our OWN extension scripts read from disk in this
       // test (not external/user input); eval loads the real scripts into the page,
       // mirroring extension/tests/capture.spec.js.
@@ -53,25 +61,7 @@ async function boot(page, { withInject = false } = {}) {
 // Let queued postMessage events flush before reading the session.
 const flush = (page) => page.evaluate(() => new Promise((r) => setTimeout(r, 30)));
 
-test("replays is / ds / mlti into the final text, all keystroke-backed", async ({ page }) => {
-  await boot(page);
-  await page.evaluate(() => {
-    window.__postOp({ ty: "is", ibi: 1, s: "Hello " });
-    window.__postOp({ ty: "mlti", mts: [{ ty: "is", ibi: 7, s: "word" }] });
-    window.__postOp({ ty: "ds", si: 10, ei: 10 }); // delete the 'd' of "word"
-    window.__postOp({ ty: "is", ibi: 10, s: "ld" }); // -> "Hello world"
-  });
-  await flush(page);
-
-  const s = await page.evaluate(() => window.__session());
-  expect(s.surface_kind).toBe("gdocs");
-  expect(s.final_text).toBe("Hello world");
-  // No insertion arrived without keystrokes — nothing should be flagged as a paste.
-  const unkeyed = s.events.filter((e) => e.inserted_chars > 0 && e.keystrokes === 0);
-  expect(unkeyed).toHaveLength(0);
-});
-
-test("flags a paste as the only keystroke-less insertion", async ({ page }) => {
+test("flags a paste as the only keystroke-less op", async ({ page }) => {
   await boot(page);
   await page.evaluate(() => {
     window.__postOp({ ty: "is", ibi: 1, s: "typed " }); // typed
@@ -83,10 +73,10 @@ test("flags a paste as the only keystroke-less insertion", async ({ page }) => {
   await flush(page);
 
   const s = await page.evaluate(() => window.__session());
-  expect(s.final_text).toBe("typed PASTED BLOCK");
-  const unkeyed = s.events.filter((e) => e.inserted_chars > 0 && e.keystrokes === 0);
-  expect(unkeyed).toHaveLength(1);
-  expect(unkeyed[0].inserted_chars).toBe("PASTED BLOCK".length);
+  const ops = s.log.sessions.at(-1).ops;
+  const pasted = ops.filter((o) => o.pasted === true);
+  expect(pasted).toHaveLength(1);
+  expect(Array.from(pasted[0].text).length).toBe("PASTED BLOCK".length);
 });
 
 test("the inject extracts ops from a /save body and feeds the session", async ({ page }) => {
@@ -101,24 +91,7 @@ test("the inject extracts ops from a /save body and feeds the session", async ({
   await flush(page);
 
   const s = await page.evaluate(() => window.__session());
-  expect(s.final_text).toBe("From save body");
-});
-
-// Real Google Docs /save bodies captured live (fixtures/gdocs-save.json): replaying
-// them through the actual inject + replay must reconstruct the expected text. Guards
-// the parser against drift in Docs' real save format.
-const SAMPLE = path.join(__dirname, "fixtures", "gdocs-save.json");
-test("reconstructs the expected text from real /save bodies", async ({ page }) => {
-  test.skip(!fs.existsSync(SAMPLE), "no fixtures/gdocs-save.json — see comment");
-  const { bodies, expected_text } = JSON.parse(fs.readFileSync(SAMPLE, "utf8"));
-  await boot(page, { withInject: true });
-  await page.evaluate(async (bs) => {
-    for (const b of bs) {
-      await window.fetch("https://docs.google.com/document/d/x/save?id=1", { method: "POST", body: b });
-    }
-  }, bodies);
-  await flush(page);
-
-  const s = await page.evaluate(() => window.__session());
-  expect(s.final_text).toBe(expected_text);
+  const ops = s.log.sessions.at(-1).ops;
+  expect(ops[0].text).toBe("From save ");
+  expect(ops[1].text).toBe("body");
 });
