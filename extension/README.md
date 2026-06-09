@@ -15,9 +15,14 @@ text the same way:
   `designMode` iframes.
 - **Google Docs** has its own adapter (`gdocs-inject.js` + `gdocs.js`). Docs renders
   to `<canvas>`, so its text isn't in the DOM — instead a MAIN-world script observes
-  Docs' own `/save` mutation requests and replays them into the same content-free
-  session, while the `paste` event supplies the AI-dump signal (Decisions 1 & 2).
-  The parse/replay/merge logic is covered by `tests/gdocs.spec.js`; live end-to-end
+  Docs' own `/save` mutation requests, records them as content-free edit ops, and the
+  `paste` event supplies the AI-dump signal (Decisions 1 & 2). Each visit is saved
+  to `chrome.storage.local` keyed by the doc id, so **capture persists across tab-closes
+  and reloads**: reopening the doc resumes the prior sessions and keeps accumulating
+  onto one record. Replaying those ops into text — and refusing to issue when the doc
+  was edited beyond what the extension witnessed — now lives in the Rust core
+  (`build_record`), not in JS. Capture + paste flagging are covered by
+  `tests/gdocs.spec.js`, continuity by `tests/continuity.spec.js`; live end-to-end
   validation on a logged-in doc is the remaining step. (Historical-import from a
   doc's revision log is handled separately by `core/src/gdocs.rs` and makes no paste
   claim.)
@@ -53,15 +58,16 @@ Paste a chunk of text mid-session to see the AI-paste signal: the credential's
 ## Tests
 
 The capture logic has Playwright regressions that load the real scripts into a
-page: `capture.spec.js` (generic typed-vs-pasted classification in `content.js`)
-and `gdocs.spec.js` (the Docs adapter — `/save` op replay, paste flagging, and the
-inject's body parsing):
+page: `capture.spec.js` (generic typed-vs-pasted classification in `content.js`),
+`gdocs.spec.js` (the Docs adapter — op recording, paste flagging, and the inject's
+body parsing), `continuity.spec.js` (capture persists across a simulated reload and
+accumulates), and `no-host.spec.js` (asserts no native-messaging wiring remains):
 
 ```bash
 cd extension/tests && npm i && npx playwright install chromium && npm test
 ```
 
-The extension → host → credential → AI-dump path is also covered by a Rust test
-(`cargo test -p humanshipd-host`), so the capture↔host contract is guarded in CI
-without a browser.
+Issuance itself — replay, the process record, and signing — is the Rust core's, and
+is covered by `cargo test --workspace` (including `core/tests/capture_log.rs` for
+multi-session accumulation) and the in-browser Playwright suite in `web-verify/tests`.
 
