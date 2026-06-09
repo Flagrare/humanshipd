@@ -6,6 +6,7 @@
 //! See `docs/superpowers/specs/2026-06-05-human-authorship-attestation-design.md`.
 
 pub mod canonical;
+pub mod capture_log;
 pub mod credential;
 pub mod error;
 pub mod fingerprint;
