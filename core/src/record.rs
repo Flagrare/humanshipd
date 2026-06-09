@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The current record schema identifier (spec §5).
-pub const SCHEMA: &str = "authorshipped/record@0.4";
+pub const SCHEMA: &str = "authorshipped/record@0.5";
 
 /// A metadata-only record of how a piece of text was written.
 ///
@@ -17,6 +17,15 @@ pub struct WritingSessionRecord {
     pub process: ProcessStats,
     pub evidence_flags: EvidenceFlags,
     pub replay: Replay,
+    /// How many distinct writing sessions this record accumulates (≥ 1).
+    #[serde(default = "one")]
+    pub session_count: u64,
+    /// Absolute epoch ms of the first and last captured session start (0 when
+    /// single-session / unknown). Lets the report say "written over D days."
+    #[serde(default)]
+    pub first_capture_at_ms: u64,
+    #[serde(default)]
+    pub last_capture_at_ms: u64,
 }
 
 /// Where the writing happened (capture adapter + app), no content.
@@ -131,4 +140,8 @@ pub struct EvidenceFlags {
 pub struct Replay {
     pub available: bool,
     pub log_sha256: Option<String>,
+}
+
+fn one() -> u64 {
+    1
 }

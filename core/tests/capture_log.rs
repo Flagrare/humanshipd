@@ -44,3 +44,20 @@ fn declines_when_an_op_lands_beyond_the_witnessed_buffer() {
     ]));
     assert!(matches!(log.reconstruct_text(), Err(LogError::Unwitnessed { .. })));
 }
+
+#[test]
+fn build_record_reports_two_sessions_and_aggregates_active_time() {
+    let mut log = CaptureLog::new(DocumentIdentity { kind: "gdocs".into(), id: "d".into() });
+    log.append(session("s1", 1_000, vec![
+        CapturedOp::Insert { at_ms: 0,    pos: 0, text: "Hello".into(), pasted: false },
+        CapturedOp::Insert { at_ms: 2_000, pos: 5, text: "!".into(),     pasted: false },
+    ]));
+    log.append(session("s2", 90_000_000, vec![
+        CapturedOp::Insert { at_ms: 0,    pos: 6, text: " more".into(), pasted: false },
+        CapturedOp::Insert { at_ms: 1_000, pos: 11, text: ".".into(),    pasted: false },
+    ]));
+    let record = log.build_record().unwrap();
+    assert_eq!(record.session_count, 2);
+    assert_eq!(record.process.active_ms, 3_000);
+    assert_eq!(record.document_binding.char_count, "Hello! more.".chars().count() as u64);
+}

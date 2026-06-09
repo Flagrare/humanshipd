@@ -107,6 +107,9 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
             available: false,
             log_sha256: None,
         },
+        session_count: 1,
+        first_capture_at_ms: 0,
+        last_capture_at_ms: 0,
     }
 }
 
@@ -115,7 +118,7 @@ pub fn build_record(input: &SessionInput) -> WritingSessionRecord {
 /// captured in `RevisionStats`, and do not break a same-class run. Origin detail
 /// (AI tool, paste source) is not yet available from the event stream, so the
 /// builder emits only `Typed` and `Pasted`.
-fn build_spans(events: &[EditEvent]) -> Vec<ProvenanceSpan> {
+pub(crate) fn build_spans(events: &[EditEvent]) -> Vec<ProvenanceSpan> {
     let mut spans: Vec<ProvenanceSpan> = Vec::new();
     for event in events.iter().filter(|e| e.inserted_chars > 0) {
         let provenance = if event.keystrokes > 0 {
@@ -143,7 +146,7 @@ fn build_spans(events: &[EditEvent]) -> Vec<ProvenanceSpan> {
 /// plots `length` (y) against `at_ms` (x) — a paste appears as a vertical jump, a
 /// deletion as a dip. Stride-sampled to `MAX_TIMELINE_POINTS`, always keeping the
 /// last point so the final length is faithful.
-fn build_timeline(events: &[EditEvent]) -> Vec<TimelinePoint> {
+pub(crate) fn build_timeline(events: &[EditEvent]) -> Vec<TimelinePoint> {
     let mut length: u64 = 0;
     let full: Vec<TimelinePoint> = events
         .iter()
@@ -173,8 +176,35 @@ fn build_timeline(events: &[EditEvent]) -> Vec<TimelinePoint> {
     sampled
 }
 
+/// Convert a session's normalized ops into the content-free `EditEvent`s the
+/// record aggregation consumes.
+pub(crate) fn ops_to_events(ops: &[crate::capture_log::CapturedOp]) -> Vec<EditEvent> {
+    use crate::capture_log::CapturedOp;
+    ops.iter()
+        .map(|op| match op {
+            CapturedOp::Insert { at_ms, pos, text, pasted } => {
+                let chars = text.chars().count() as u64;
+                EditEvent {
+                    at_ms: *at_ms,
+                    inserted_chars: chars,
+                    deleted_chars: 0,
+                    keystrokes: if *pasted { 0 } else { chars },
+                    at_offset: Some(*pos),
+                }
+            }
+            CapturedOp::Delete { at_ms, pos, len } => EditEvent {
+                at_ms: *at_ms,
+                inserted_chars: 0,
+                deleted_chars: *len,
+                keystrokes: *len,
+                at_offset: Some(*pos),
+            },
+        })
+        .collect()
+}
+
 /// Derive pause and burst statistics from inter-event timing.
-fn pauses_and_bursts(events: &[EditEvent]) -> (PauseStats, BurstStats) {
+pub(crate) fn pauses_and_bursts(events: &[EditEvent]) -> (PauseStats, BurstStats) {
     let mut gt_2s = 0u64;
     let mut burst_lengths: Vec<u64> = Vec::new();
     let mut current_burst = 0u64;

@@ -73,5 +73,8 @@ pub fn sample_record() -> WritingSessionRecord {
             available: false,
             log_sha256: None,
         },
+        session_count: 1,
+        first_capture_at_ms: 0,
+        last_capture_at_ms: 0,
     }
 }

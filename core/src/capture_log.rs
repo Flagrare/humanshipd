@@ -8,6 +8,10 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::canonical::sha256_hex;
+use crate::record::*;
+use crate::session::{build_spans, build_timeline, ops_to_events, pauses_and_bursts};
+
 /// Versioned log schema identifier.
 pub const LOG_SCHEMA: &str = "authorshipped/log@1";
 
@@ -86,6 +90,110 @@ impl CaptureLog {
     /// [`LogError::Unwitnessed`] when an op falls beyond the witnessed buffer.
     pub fn reconstruct_text(&self) -> Result<String, LogError> {
         Ok(self.reconstruct_buffer()?.into_iter().collect())
+    }
+
+    /// Build a content-free record over **all** sessions. Aggregates counts; active
+    /// time is the sum of per-session writing spans; cross-session gaps are session
+    /// boundaries, not pauses. Declines with [`LogError`] on unwitnessed content.
+    pub fn build_record(&self) -> Result<WritingSessionRecord, LogError> {
+        let text: String = self.reconstruct_buffer()?.into_iter().collect();
+
+        let per_session: Vec<Vec<crate::session::EditEvent>> =
+            self.sessions.iter().map(|s| ops_to_events(&s.ops)).collect();
+        let all: Vec<crate::session::EditEvent> =
+            per_session.iter().flatten().cloned().collect();
+
+        let keystrokes: u64 = all.iter().map(|e| e.keystrokes).sum();
+        let total_inserted: u64 = all.iter().map(|e| e.inserted_chars).sum();
+        let keyed_inserted: u64 =
+            all.iter().filter(|e| e.keystrokes > 0).map(|e| e.inserted_chars).sum();
+        let keyed_fraction = if total_inserted > 0 {
+            keyed_inserted as f64 / total_inserted as f64
+        } else {
+            1.0
+        };
+        let insertions_without_keystrokes: Vec<UnkeyedInsertion> = all
+            .iter()
+            .filter(|e| e.inserted_chars > 0 && e.keystrokes == 0)
+            .map(|e| UnkeyedInsertion { size: e.inserted_chars })
+            .collect();
+        let large_unkeyed_insertions = insertions_without_keystrokes
+            .iter()
+            .filter(|u| u.size >= crate::session::LARGE_UNKEYED_THRESHOLD)
+            .count() as u64;
+        let revisions = RevisionStats {
+            insertions: all.iter().filter(|e| e.inserted_chars > 0).count() as u64,
+            deletions: all.iter().filter(|e| e.deleted_chars > 0).count() as u64,
+            reformulations: 0,
+        };
+
+        let mut active_ms = 0u64;
+        let mut gt_2s = 0u64;
+        let mut burst_count = 0u64;
+        let mut burst_total = 0f64;
+        let mut spans: Vec<ProvenanceSpan> = Vec::new();
+        let mut timeline: Vec<TimelinePoint> = Vec::new();
+        let mut clock = 0u64;
+        for events in &per_session {
+            if let (Some(first), Some(last)) = (events.first(), events.last()) {
+                active_ms += last.at_ms.saturating_sub(first.at_ms);
+            }
+            let (p, b) = pauses_and_bursts(events);
+            gt_2s += p.gt_2s;
+            burst_count += b.count;
+            burst_total += b.mean_len * b.count as f64;
+            spans.extend(build_spans(events));
+            for mut pt in build_timeline(events) {
+                pt.at_ms += clock;
+                timeline.push(pt);
+            }
+            if let Some(last) = events.last() {
+                clock += last.at_ms + 1;
+            }
+        }
+        let pauses = PauseStats { gt_2s, buckets: Vec::new() };
+        let bursts = BurstStats {
+            count: burst_count,
+            mean_len: if burst_count > 0 { burst_total / burst_count as f64 } else { 0.0 },
+            buckets: Vec::new(),
+        };
+
+        let surface = self
+            .sessions
+            .last()
+            .map(|s| Surface { kind: s.surface_kind.clone(), app: s.surface_app.clone() })
+            .unwrap_or(Surface { kind: self.identity.kind.clone(), app: String::new() });
+        let session_id = self
+            .sessions
+            .last()
+            .map(|s| s.session_id.clone())
+            .unwrap_or_default();
+
+        Ok(WritingSessionRecord {
+            schema: SCHEMA.to_string(),
+            session_id,
+            surface,
+            document_binding: DocumentBinding {
+                final_text_sha256: sha256_hex(text.as_bytes()),
+                char_count: text.chars().count() as u64,
+            },
+            process: ProcessStats {
+                active_ms,
+                keystrokes,
+                bursts,
+                pauses,
+                revisions,
+                insertions_without_keystrokes,
+                keyed_fraction,
+                spans,
+                timeline,
+            },
+            evidence_flags: EvidenceFlags { large_unkeyed_insertions },
+            replay: Replay { available: false, log_sha256: None },
+            session_count: self.sessions.len() as u64,
+            first_capture_at_ms: self.sessions.first().map(|s| s.started_at_ms).unwrap_or(0),
+            last_capture_at_ms: self.sessions.last().map(|s| s.started_at_ms).unwrap_or(0),
+        })
     }
 
     fn reconstruct_buffer(&self) -> Result<Vec<char>, LogError> {
