@@ -20,6 +20,7 @@
 
   let priorSessions = []; // sessions loaded from storage (earlier page-loads)
   let sessionIndex = 0; // this page-load's session number
+  let loaded = false; // true once prior sessions are read and sessionIndex is final
   let startedAtMs = Date.now();
   const ops = []; // this session's normalized CapturedOps
   let pendingPaste = null; // { len, at } awaiting the next insert
@@ -81,7 +82,9 @@
   }
   function saveNow() {
     saveTimer = null;
-    if (ops.length === 0) return;
+    // Don't write until the resume-load has set the final sessionIndex — otherwise an
+    // early keystroke could persist under s0 and clobber a prior session's key.
+    if (!loaded || ops.length === 0) return;
     chrome.storage.local.set({ [`${KEY_PREFIX}:s${sessionIndex}`]: currentSession() });
   }
   window.addEventListener("pagehide", saveNow, true);
@@ -95,6 +98,8 @@
         .sort((a, b) => Number(a.split(":s")[1]) - Number(b.split(":s")[1]));
       priorSessions = keys.map((k) => all[k]);
       sessionIndex = priorSessions.length; // this page-load is the next session
+      loaded = true;
+      if (ops.length > 0) saveSoon(); // flush anything typed while the load was in flight
     });
   }
 

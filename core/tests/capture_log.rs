@@ -82,7 +82,8 @@ fn cross_session_gap_is_not_a_pause_and_timeline_is_monotonic() {
         prev = pt.at_ms;
     }
     assert_eq!(r.first_capture_at_ms, 1_000);
-    assert_eq!(r.last_capture_at_ms, 90_000_000);
+    // Last capture = last session's start (90_000_000) + its final op offset (100).
+    assert_eq!(r.last_capture_at_ms, 90_000_100);
 }
 
 #[test]

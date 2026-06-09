@@ -34,6 +34,15 @@ pub enum CapturedOp {
     Delete { at_ms: u64, pos: u64, len: u64 },
 }
 
+impl CapturedOp {
+    /// Milliseconds since this op's session started.
+    pub fn at_ms(&self) -> u64 {
+        match self {
+            CapturedOp::Insert { at_ms, .. } | CapturedOp::Delete { at_ms, .. } => *at_ms,
+        }
+    }
+}
+
 /// One contiguous writing session (one page-load / app run).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CaptureSession {
@@ -192,7 +201,13 @@ impl CaptureLog {
             replay: Replay { available: false, log_sha256: None },
             session_count: self.sessions.len() as u64,
             first_capture_at_ms: self.sessions.first().map(|s| s.started_at_ms).unwrap_or(0),
-            last_capture_at_ms: self.sessions.last().map(|s| s.started_at_ms).unwrap_or(0),
+            // Wall-clock time of the last witnessed edit: the last session's start
+            // plus its final op's offset — not merely when that session opened.
+            last_capture_at_ms: self
+                .sessions
+                .last()
+                .map(|s| s.started_at_ms + s.ops.last().map(CapturedOp::at_ms).unwrap_or(0))
+                .unwrap_or(0),
         })
     }
 
