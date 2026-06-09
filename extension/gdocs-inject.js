@@ -10,6 +10,12 @@
 // so no inline <script> injection is needed.
 
 (() => {
+  // Top frame only. Docs spawns ~8 frames; `/save` traffic originates from the top
+  // document, so patching every child iframe's fetch/XHR is pure overhead and risks
+  // interfering with Docs' internals. The manifest scopes this to the top frame
+  // (all_frames:false); this guard is belt-and-suspenders.
+  if (window.top !== window) return;
+
   const TAG = "humanshipd-gdocs";
 
   const isSave = (url) => {

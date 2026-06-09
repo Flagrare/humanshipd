@@ -25,6 +25,19 @@
 
   const charsOf = (s) => Array.from(s || "");
 
+  // Insert `items` into `arr` at `pos`. For small inserts the spread form is
+  // fastest; for a very large insert (e.g. pasting a big block) spreading the array
+  // as call arguments can overflow the stack, so rebuild without spreading.
+  function insertAt(arr, pos, items) {
+    if (items.length <= 32768) {
+      arr.splice(pos, 0, ...items);
+      return;
+    }
+    const tail = arr.splice(pos);
+    for (let i = 0; i < items.length; i++) arr.push(items[i]);
+    for (let i = 0; i < tail.length; i++) arr.push(tail[i]);
+  }
+
   function stamp(at) {
     if (startTime === null) startTime = at;
     return Math.max(at - startTime, 0);
@@ -51,7 +64,7 @@
         const chars = charsOf(op.s);
         if (chars.length === 0) return;
         const pos = Math.min(Math.max(ibi - 1, 0), buf.length);
-        buf.splice(pos, 0, ...chars);
+        insertAt(buf, pos, chars);
         const pasted = consumePasteFor(chars.length, at);
         events.push({
           at_ms: stamp(at),
