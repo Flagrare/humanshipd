@@ -1,13 +1,10 @@
-// Content script (ISOLATED world, docs.google.com): turn Google Docs' live edit
-// stream into a content-free writing session. It receives `/save` mutation ops from
-// gdocs-inject.js (which runs in the page's own JS context — see that file) and
-// `paste` clipboard events, replays them into a reconstructed document + event
-// stream, and answers the popup's `getSession`.
-//
-// Replay mirrors core/src/gdocs.rs::apply_op so the live path and the historical
-// /revisions/load path reconstruct byte-identical text (and thus the same content
-// fingerprint). Only counts, timing, and the locally-reconstructed text exist here;
-// nothing is sent anywhere except the local host at issue time.
+// Content script (ISOLATED world, docs.google.com): records normalized writing ops
+// from Google Docs' live edit stream without reconstructing text. Receives `/save`
+// mutation ops forwarded by gdocs-inject.js (page JS context) and `paste` clipboard
+// events, converts them into CapturedOps (insert/delete), and persists each
+// page-load as a sharded session in chrome.storage.local. On reload it resumes from
+// prior sessions so typing across multiple visits accumulates into one log.
+// Text reconstruction and stat aggregation now live in core's `build_record`, not here.
 //
 // Paste detection (Decision 1): the `paste` event is the real paste signal. It
 // fires in the editor *iframe*, while `/save` fires from the top page — so every
@@ -18,94 +15,93 @@
   const TAG = "humanshipd-gdocs";
   const isTop = window.top === window;
 
-  let startTime = null;
-  const buf = []; // reconstruction buffer, one entry per code point
-  const events = [];
-  let pendingPaste = null; // { len, at } awaiting the next insert to flag as a paste
+  const docId = (location.pathname.match(/\/d\/([^/]+)/) || [])[1] || "unknown";
+  const KEY_PREFIX = `humanshipd:log:gdocs:${docId}`;
+
+  let priorSessions = []; // sessions loaded from storage (earlier page-loads)
+  let sessionIndex = 0; // this page-load's session number
+  let startedAtMs = Date.now();
+  const ops = []; // this session's normalized CapturedOps
+  let pendingPaste = null; // { len, at } awaiting the next insert
 
   const charsOf = (s) => Array.from(s || "");
 
-  // Insert `items` into `arr` at `pos`. For small inserts the spread form is
-  // fastest; for a very large insert (e.g. pasting a big block) spreading the array
-  // as call arguments can overflow the stack, so rebuild without spreading.
-  function insertAt(arr, pos, items) {
-    if (items.length <= 32768) {
-      arr.splice(pos, 0, ...items);
-      return;
-    }
-    const tail = arr.splice(pos);
-    for (let i = 0; i < items.length; i++) arr.push(items[i]);
-    for (let i = 0; i < tail.length; i++) arr.push(tail[i]);
-  }
-
-  function stamp(at) {
-    if (startTime === null) startTime = at;
-    return Math.max(at - startTime, 0);
-  }
-
-  // A paste flags the next insert of matching length within a short window. Docs
-  // coalesces a paste into one `is`, so size + timing line up (validated 2026-06-07).
   function consumePasteFor(len, at) {
     if (!pendingPaste) return false;
     const recent = at - pendingPaste.at < 4000;
     const sized = pendingPaste.len === 0 || pendingPaste.len === len;
-    if (recent && sized) {
-      pendingPaste = null;
-      return true;
-    }
+    if (recent && sized) { pendingPaste = null; return true; }
     return false;
   }
 
-  // Replay one op into buf + events, recursing `mlti` bundles. Mirrors gdocs.rs.
-  function applyOp(op, at) {
+  // Translate a Google Docs save op (is/ds/mlti) into normalized CapturedOps and
+  // record them. Text reconstruction now lives in core (build_record), not here.
+  function recordOp(op, at) {
     switch (op && op.ty) {
       case "is": {
         const ibi = Number.isInteger(op.ibi) ? op.ibi : 1;
         const chars = charsOf(op.s);
         if (chars.length === 0) return;
-        const pos = Math.min(Math.max(ibi - 1, 0), buf.length);
-        insertAt(buf, pos, chars);
         const pasted = consumePasteFor(chars.length, at);
-        events.push({
-          at_ms: stamp(at),
-          inserted_chars: chars.length,
-          deleted_chars: 0,
-          keystrokes: pasted ? 0 : chars.length,
-          at_offset: Math.max(ibi - 1, 0),
-        });
+        ops.push({ op: "insert", at_ms: Math.max(at - startedAtMs, 0), pos: Math.max(ibi - 1, 0), text: chars.join(""), pasted });
         break;
       }
       case "ds": {
         const si = Number.isInteger(op.si) ? op.si : 1;
         const ei = Number.isInteger(op.ei) ? op.ei : si;
-        const start = Math.min(Math.max(si - 1, 0), buf.length);
-        const end = Math.max(Math.min(ei, buf.length), start); // ei is 1-based inclusive
-        const n = end - start;
-        if (n === 0) return;
-        buf.splice(start, n);
-        events.push({
-          at_ms: stamp(at),
-          inserted_chars: 0,
-          deleted_chars: n,
-          keystrokes: n,
-          at_offset: Math.max(si - 1, 0),
-        });
+        const len = Math.max(ei - si + 1, 0);
+        if (len === 0) return;
+        ops.push({ op: "delete", at_ms: Math.max(at - startedAtMs, 0), pos: Math.max(si - 1, 0), len });
         break;
       }
       case "mlti": {
-        const mts = Array.isArray(op.mts) ? op.mts : [];
-        for (const sub of mts) applyOp(sub, at);
+        for (const sub of (op.mts || [])) recordOp(sub, at);
         break;
       }
       default:
-        break; // style/setup ops carry no text
+        break;
     }
+    saveSoon();
+  }
+
+  function currentSession() {
+    return {
+      session_id: `gdocs-${docId}-${sessionIndex}`,
+      surface_kind: "gdocs",
+      surface_app: "docs.google.com",
+      started_at_ms: startedAtMs,
+      ops,
+    };
+  }
+
+  let saveTimer = null;
+  function saveSoon() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(saveNow, 1500);
+  }
+  function saveNow() {
+    saveTimer = null;
+    if (ops.length === 0) return;
+    chrome.storage.local.set({ [`${KEY_PREFIX}:s${sessionIndex}`]: currentSession() });
+  }
+  window.addEventListener("pagehide", saveNow, true);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") saveNow(); }, true);
+
+  // On load (top frame only): pull prior sessions, start a new session after them.
+  if (isTop) {
+    chrome.storage.local.get(null, (all) => {
+      const keys = Object.keys(all || {})
+        .filter((k) => k.startsWith(`${KEY_PREFIX}:s`))
+        .sort((a, b) => Number(a.split(":s")[1]) - Number(b.split(":s")[1]));
+      priorSessions = keys.map((k) => all[k]);
+      sessionIndex = priorSessions.length; // this page-load is the next session
+    });
   }
 
   window.addEventListener("message", (event) => {
     const d = event.data;
     if (!d || d.source !== TAG) return;
-    if (d.kind === "op" && isTop) applyOp(d.op, d.at);
+    if (d.kind === "op" && isTop) recordOp(d.op, d.at);
     else if (d.kind === "paste" && isTop) pendingPaste = { len: d.len, at: d.at };
   });
 
@@ -129,13 +125,11 @@
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "getSession") return false;
-    if (events.length === 0) return false; // nothing captured here — stay silent
+    const sessions = ops.length > 0 ? [...priorSessions, currentSession()] : [...priorSessions];
+    if (sessions.length === 0 || sessions.every((s) => s.ops.length === 0)) return false;
     sendResponse({
-      session_id: `gdocs-${Date.now()}`,
+      log: { schema: "authorshipped/log@1", identity: { kind: "gdocs", id: docId }, sessions },
       surface_kind: "gdocs",
-      surface_app: "docs.google.com",
-      final_text: buf.join(""),
-      events,
     });
     return true;
   });
